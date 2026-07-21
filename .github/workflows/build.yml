@@ -79,6 +79,16 @@ jobs:
           echo "Found unsigned/auto-signed APK at: $APK_PATH"
           cp "$APK_PATH" ../ki2-pro-unsigned.apk
 
+      - name: Generate Karoo OTA manifest
+        env:
+          RELEASE_NOTES: ${{ github.event.release.body }}
+        run: |
+          printf '%s' "$RELEASE_NOTES" > notes.txt
+          [ -s notes.txt ] || printf 'Ki2 Pro %s' "${{ github.ref_name }}" > notes.txt
+          python3 ki2/.scripts/generate-manifest.py ki2/app/manifest-template.json manifest.json "${{ github.ref_name }}" "${{ github.run_number }}" notes.txt
+          echo "Generated manifest.json:" && cat manifest.json
+          python3 -c "import json; m=json.load(open('manifest.json')); assert m['packageName']=='com.valterc.ki2.pro', 'manifest packageName wrong: '+m['packageName']"
+
       - name: Re-sign with stable debug key
         run: |
           APKSIGNER=$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -1)
@@ -111,11 +121,13 @@ jobs:
         if: github.event_name == 'release'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload ${{ github.event.release.tag_name }} ki2-pro.apk --clobber
+        run: gh release upload ${{ github.event.release.tag_name }} ki2-pro.apk manifest.json --clobber
 
       - name: Upload artifact (manual runs)
         if: github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v4
         with:
           name: ki2-pro-apk
-          path: ki2-pro.apk
+          path: |
+            ki2-pro.apk
+            manifest.json
