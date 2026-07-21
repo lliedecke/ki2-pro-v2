@@ -19,6 +19,92 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: valterc/ki2
+          ref: 8fa5370eac97685d10bfbc5730b0e29267abd48c
+          fetch-depth: 0
+          path: ki2
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Apply Ki2 Pro patch
+        run: cd ki2 && git apply ../ki2-pro.patch
+
+      - name: Inject ANT network key
+        env:
+          S_NETWORK_KEY: ${{ secrets.S_NETWORK_KEY }}
+        run: |
+          if [ -z "$S_NETWORK_KEY" ]; then
+            echo "::error::Missing repository secret S_NETWORK_KEY (the value inside secrets.xml)."
+            exit 1
+          fi
+          printf '<?xml version="1.0" encoding="utf-8"?><resources><string name="network_key">%s</string></resources>' "$S_NETWORK_KEY" > ki2/app/src/main/res/values/secrets.xml
+
+      - name: Provide karoo-ext 1.1.2
+        env:
+          GH_USER: ${{ secrets.GH_USER }}
+          GH_KEY: ${{ secrets.GH_KEY }}
+        run: |
+          if [ -n "$GH_KEY" ]; then
+            echo "Using GitHub Packages with provided token"
+            echo "gpr.user=$GH_USER" >> ki2/local.properties
+            echo "gpr.key=$GH_KEY"  >> ki2/local.properties
+          else
+            echo "Building karoo-ext 1.1.2 from source into mavenLocal"
+            git clone --depth 1 --branch 1.1.2 https://github.com/hammerheadnav/karoo-ext ext
+            cd ext && chmod +x gradlew
+            ./gradlew :lib:publishToMavenLocal --no-daemon -PlibVersion=1.1.2 || \
+            ./gradlew publishToMavenLocal --no-daemon -PlibVersion=1.1.2
+            cd ..
+            ls -R ~/.m2/repository/io/hammerhead || true
+            sed -i '/dependencyResolutionManagement/,/repositories {/ s/repositories {/repositories {\n        mavenLocal()/' ki2/settings.gradle
+            echo "gpr.user=x" >> ki2/local.properties
+            echo "gpr.key=x"  >> ki2/local.properties
+          fi
+
+      - name: Build APK
+        run: |
+          echo "VERSION_NAME=${{ github.ref_name }}" >> ki2/local.properties
+          echo "VERSION_CODE=${{ github.run_number }}" >> ki2/local.properties
+          cd ki2 && chmod +x gradlew && ./gradlew assembleDebug --no-daemon
+          cp app/build/outputs/apk/debug/app-debug.apk ../ki2-pro.apk
+
+      - name: Attach APK to release
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload ${{ github.event.release.tag_name }} ki2-pro.apk --clobber
+
+      - name: Upload artifact (manual runs)
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ki2-pro-apk
+          path: ki2-pro.apk
+name: Ki2 Pro Build
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout this repo (patch)
+        uses: actions/checkout@v4
+
+      - name: Checkout upstream Ki2 (pinned)
+        uses: actions/checkout@v4
+        with:
+          repository: valterc/ki2
           ref: 8fa5370eac97
           path: ki2
 
