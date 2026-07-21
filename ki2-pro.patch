@@ -1,0 +1,3519 @@
+diff --git a/app/src/main/java/com/valterc/ki2/data/action/KarooAction.java b/app/src/main/java/com/valterc/ki2/data/action/KarooAction.java
+index 6918d47..970c5ca 100644
+--- a/app/src/main/java/com/valterc/ki2/data/action/KarooAction.java
++++ b/app/src/main/java/com/valterc/ki2/data/action/KarooAction.java
+@@ -29,7 +29,9 @@ public enum KarooAction {
+     VIRTUAL_ZOOM_OUT,
+     VIRTUAL_ZOOM_IN,
+     VIRTUAL_CONTROL_CENTER,
+-    VIRTUAL_DRAWER_ACTION;
++    VIRTUAL_DRAWER_ACTION,
++    VIRTUAL_AERO_SEGMENT,
++    VIRTUAL_FUEL_LOG;
+ 
+     private static final KarooAction[] values = KarooAction.values();
+ 
+diff --git a/app/src/main/java/com/valterc/ki2/data/preferences/PreferencesView.java b/app/src/main/java/com/valterc/ki2/data/preferences/PreferencesView.java
+index 4c79d02..ce906f7 100644
+--- a/app/src/main/java/com/valterc/ki2/data/preferences/PreferencesView.java
++++ b/app/src/main/java/com/valterc/ki2/data/preferences/PreferencesView.java
+@@ -220,6 +220,112 @@ public class PreferencesView implements Parcelable {
+                 () -> context.getResources().getBoolean(R.bool.default_preference_switch_turn_screen_on));
+     }
+ 
++    /**
++     * Get the configured wheel circumference in millimeters.
++     * Used by gear inches, speed at cadence and shift advice computations.
++     *
++     * @param context Ki2 application context. Cannot be a context generated from another package.
++     * @return Wheel circumference in millimeters.
++     */
++    public int getWheelCircumferenceMm(Context context) {
++        String value = getString(context.getString(R.string.preference_wheel_circumference), context.getString(R.string.default_preference_wheel_circumference));
++        try {
++            int parsed = Integer.parseInt(value.trim());
++            return parsed > 0 ? parsed : Integer.parseInt(context.getString(R.string.default_preference_wheel_circumference));
++        } catch (Exception e) {
++            return Integer.parseInt(context.getString(R.string.default_preference_wheel_circumference));
++        }
++    }
++
++    /**
++     * Get the configured target cadence in RPM. Used by shift advice.
++     *
++     * @param context Ki2 application context. Cannot be a context generated from another package.
++     * @return Target cadence in RPM.
++     */
++    public int getTargetCadence(Context context) {
++        String value = getString(context.getString(R.string.preference_target_cadence), context.getString(R.string.default_preference_target_cadence));
++        try {
++            int parsed = Integer.parseInt(value.trim());
++            return parsed > 0 ? parsed : Integer.parseInt(context.getString(R.string.default_preference_target_cadence));
++        } catch (Exception e) {
++            return Integer.parseInt(context.getString(R.string.default_preference_target_cadence));
++        }
++    }
++
++    private double getDoublePreference(Context context, int keyResource, int defaultResource) {
++        String value = getString(context.getString(keyResource), context.getString(defaultResource));
++        try {
++            double parsed = Double.parseDouble(value.trim().replace(',', '.'));
++            return parsed > 0 ? parsed : Double.parseDouble(context.getString(defaultResource));
++        } catch (Exception e) {
++            return Double.parseDouble(context.getString(defaultResource));
++        }
++    }
++
++    /**
++     * Total system mass (rider + bike + kit) in kilograms. Used by aero and pacing features.
++     */
++    public double getTotalMassKg(Context context) {
++        return getDoublePreference(context, R.string.preference_total_mass, R.string.default_preference_total_mass);
++    }
++
++    /**
++     * Rolling resistance coefficient. Used by aero and pacing features.
++     */
++    public double getCrr(Context context) {
++        return getDoublePreference(context, R.string.preference_crr, R.string.default_preference_crr);
++    }
++
++    /**
++     * Drivetrain efficiency (0-1). Used by aero and pacing features.
++     */
++    public double getDrivetrainEfficiency(Context context) {
++        return getDoublePreference(context, R.string.preference_drivetrain_efficiency, R.string.default_preference_drivetrain_efficiency);
++    }
++
++    /**
++     * Air density in kg/m3. Used by aero and pacing features.
++     */
++    public double getAirDensity(Context context) {
++        return getDoublePreference(context, R.string.preference_air_density, R.string.default_preference_air_density);
++    }
++
++    /**
++     * Calibrated CdA in m2. Used by the wind gauge and split predictor.
++     */
++    public double getCalibratedCda(Context context) {
++        return getDoublePreference(context, R.string.preference_calibrated_cda, R.string.default_preference_calibrated_cda);
++    }
++
++    /**
++     * Race distance in kilometers for the split predictor.
++     */
++    public double getRaceDistanceKm(Context context) {
++        return getDoublePreference(context, R.string.preference_race_distance, R.string.default_preference_race_distance);
++    }
++
++    /**
++     * Target split in minutes for the split predictor.
++     */
++    public double getTargetSplitMinutes(Context context) {
++        return getDoublePreference(context, R.string.preference_target_split, R.string.default_preference_target_split);
++    }
++
++    /**
++     * Carbohydrate intake target in grams per hour.
++     */
++    public int getCarbsTargetGramsPerHour(Context context) {
++        return (int) getDoublePreference(context, R.string.preference_carbs_per_hour, R.string.default_preference_carbs_per_hour);
++    }
++
++    /**
++     * Carbohydrate portion size (one gel / bar) in grams.
++     */
++    public int getCarbsPortionGrams(Context context) {
++        return (int) getDoublePreference(context, R.string.preference_carbs_portion, R.string.default_preference_carbs_portion);
++    }
++
+     /**
+      * Get the battery level that should be considered as low battery.
+      *
+diff --git a/app/src/main/java/com/valterc/ki2/input/ActionAdapter.java b/app/src/main/java/com/valterc/ki2/input/ActionAdapter.java
+index f44d108..4767c07 100644
+--- a/app/src/main/java/com/valterc/ki2/input/ActionAdapter.java
++++ b/app/src/main/java/com/valterc/ki2/input/ActionAdapter.java
+@@ -51,7 +51,9 @@ public class ActionAdapter {
+         this.keyMapping.put(KarooAction.VIRTUAL_DOUBLE_BEEP, karooKeyEvent -> context.getAudioManager().playDoubleBeep(false));
+         this.keyMapping.put(KarooAction.VIRTUAL_BELL_OLD, karooKeyEvent -> context.getAudioManager().playKarooBellOld(false));
+         this.keyMapping.put(KarooAction.VIRTUAL_BELL_NEW, karooKeyEvent -> context.getAudioManager().playKarooBellNew(false));
+-        this.keyMapping.put(KarooAction.VIRTUAL_LAP, karooKeyEvent -> context.getKarooSystem().dispatch(MarkLap.INSTANCE));
++        this.keyMapping.put(KarooAction.VIRTUAL_LAP, karooKeyEvent -> context.getKarooSystem().dispatch(MarkLap.INSTANCE));
++        this.keyMapping.put(KarooAction.VIRTUAL_AERO_SEGMENT, karooKeyEvent -> context.getAeroEngine().startNewSegment());
++        this.keyMapping.put(KarooAction.VIRTUAL_FUEL_LOG, karooKeyEvent -> context.getFuelEngine().logIntake());
+         this.keyMapping.put(KarooAction.VIRTUAL_ZOOM_IN, karooKeyEvent -> context.getKarooSystem().dispatch(new ZoomPage(true)));
+         this.keyMapping.put(KarooAction.VIRTUAL_ZOOM_OUT, karooKeyEvent -> context.getKarooSystem().dispatch(new ZoomPage(false)));
+         this.keyMapping.put(KarooAction.VIRTUAL_CONTROL_CENTER, karooKeyEvent -> context.getKarooSystem().dispatch(PerformHardwareAction.ControlCenterComboPress.INSTANCE));
+diff --git a/app/src/main/java/com/valterc/ki2/input/InputManager.java b/app/src/main/java/com/valterc/ki2/input/InputManager.java
+index 95f7c50..ea7866e 100644
+--- a/app/src/main/java/com/valterc/ki2/input/InputManager.java
++++ b/app/src/main/java/com/valterc/ki2/input/InputManager.java
+@@ -1,325 +1,327 @@
+-package com.valterc.ki2.input;
+-
+-import android.content.Context;
+-import android.content.SharedPreferences;
+-import android.util.Pair;
+-
+-import androidx.annotation.Nullable;
+-import androidx.preference.PreferenceManager;
+-
+-import com.valterc.ki2.R;
+-import com.valterc.ki2.data.action.KarooActionEvent;
+-import com.valterc.ki2.data.switches.SwitchCommand;
+-import com.valterc.ki2.data.switches.SwitchCommandType;
+-import com.valterc.ki2.data.switches.SwitchEvent;
+-import com.valterc.ki2.data.switches.SwitchType;
+-import com.valterc.ki2.data.action.KarooAction;
+-
+-import java.util.HashMap;
+-import java.util.Map;
+-import java.util.function.BiFunction;
+-import java.util.function.Function;
+-
+-import timber.log.Timber;
+-
+-public class InputManager {
+-
+-    /**
+-     * This map translates a preference value to function able to generate a Karoo action event from the original switch event.
+-     */
+-    private static final Map<String, BiFunction<SwitchEvent, Function<SwitchEvent, KarooActionEvent>, KarooActionEvent>> preferenceToSwitchKeyMap = new HashMap<>();
+-
+-    static {
+-
+-        /*
+-         * Any switch event
+-         */
+-        preferenceToSwitchKeyMap.put("none", (switchEvent, converter) -> null);
+-
+-        /*
+-         *   Single / Double press events
+-         */
+-        preferenceToSwitchKeyMap.put("top_left", (switchEvent, converter) -> new KarooActionEvent(KarooAction.TOP_LEFT, switchEvent.getRepeat()));
+-        preferenceToSwitchKeyMap.put("top_right", (switchEvent, converter) -> new KarooActionEvent(KarooAction.TOP_RIGHT, switchEvent.getRepeat()));
+-        preferenceToSwitchKeyMap.put("bottom_left", (switchEvent, converter) -> new KarooActionEvent(KarooAction.BOTTOM_LEFT,switchEvent.getRepeat()));
+-        preferenceToSwitchKeyMap.put("bottom_right", (switchEvent, converter) -> new KarooActionEvent(KarooAction.BOTTOM_RIGHT, switchEvent.getRepeat()));
++package com.valterc.ki2.input;
++
++import android.content.Context;
++import android.content.SharedPreferences;
++import android.util.Pair;
++
++import androidx.annotation.Nullable;
++import androidx.preference.PreferenceManager;
++
++import com.valterc.ki2.R;
++import com.valterc.ki2.data.action.KarooActionEvent;
++import com.valterc.ki2.data.switches.SwitchCommand;
++import com.valterc.ki2.data.switches.SwitchCommandType;
++import com.valterc.ki2.data.switches.SwitchEvent;
++import com.valterc.ki2.data.switches.SwitchType;
++import com.valterc.ki2.data.action.KarooAction;
++
++import java.util.HashMap;
++import java.util.Map;
++import java.util.function.BiFunction;
++import java.util.function.Function;
++
++import timber.log.Timber;
++
++public class InputManager {
++
++    /**
++     * This map translates a preference value to function able to generate a Karoo action event from the original switch event.
++     */
++    private static final Map<String, BiFunction<SwitchEvent, Function<SwitchEvent, KarooActionEvent>, KarooActionEvent>> preferenceToSwitchKeyMap = new HashMap<>();
++
++    static {
++
++        /*
++         * Any switch event
++         */
++        preferenceToSwitchKeyMap.put("none", (switchEvent, converter) -> null);
++
++        /*
++         *   Single / Double press events
++         */
++        preferenceToSwitchKeyMap.put("top_left", (switchEvent, converter) -> new KarooActionEvent(KarooAction.TOP_LEFT, switchEvent.getRepeat()));
++        preferenceToSwitchKeyMap.put("top_right", (switchEvent, converter) -> new KarooActionEvent(KarooAction.TOP_RIGHT, switchEvent.getRepeat()));
++        preferenceToSwitchKeyMap.put("bottom_left", (switchEvent, converter) -> new KarooActionEvent(KarooAction.BOTTOM_LEFT,switchEvent.getRepeat()));
++        preferenceToSwitchKeyMap.put("bottom_right", (switchEvent, converter) -> new KarooActionEvent(KarooAction.BOTTOM_RIGHT, switchEvent.getRepeat()));
+         preferenceToSwitchKeyMap.put("lap", (switchEvent, converter) -> new KarooActionEvent(KarooAction.VIRTUAL_LAP, switchEvent.getRepeat()));
+-        preferenceToSwitchKeyMap.put("press_map_graph_zoom_out", (switchEvent, converter) -> new KarooActionEvent(KarooAction.VIRTUAL_ZOOM_OUT, switchEvent.getRepeat()));
+-        preferenceToSwitchKeyMap.put("press_map_graph_zoom_in", (switchEvent, converter) -> new KarooActionEvent(KarooAction.VIRTUAL_ZOOM_IN, switchEvent.getRepeat()));
+-        preferenceToSwitchKeyMap.put("press_switch_to_map_page", (switchEvent, converter) -> new KarooActionEvent(KarooAction.VIRTUAL_SWITCH_TO_MAP_PAGE, switchEvent.getRepeat()));
+-        preferenceToSwitchKeyMap.put("press_turn_screen_on", (switchEvent, converter) -> new KarooActionEvent(KarooAction.VIRTUAL_TURN_SCREEN_ON, switchEvent.getRepeat()));
+-        preferenceToSwitchKeyMap.put("press_turn_screen_off", (switchEvent, converter) -> new KarooActionEvent(KarooAction.VIRTUAL_TURN_SCREEN_OFF, switchEvent.getRepeat()));
+-        preferenceToSwitchKeyMap.put("press_toggle_audio_alerts", (switchEvent, converter) -> new KarooActionEvent(KarooAction.VIRTUAL_TOGGLE_AUDIO_ALERTS, switchEvent.getRepeat()));
+-        preferenceToSwitchKeyMap.put("press_disable_audio_alerts", (switchEvent, converter) -> new KarooActionEvent(KarooAction.VIRTUAL_DISABLE_AUDIO_ALERTS, switchEvent.getRepeat()));
+-        preferenceToSwitchKeyMap.put("press_enable_audio_alerts", (switchEvent, converter) -> new KarooActionEvent(KarooAction.VIRTUAL_ENABLE_AUDIO_ALERTS, switchEvent.getRepeat()));
+-        preferenceToSwitchKeyMap.put("press_single_beep", (switchEvent, converter) -> new KarooActionEvent(KarooAction.VIRTUAL_SINGLE_BEEP, switchEvent.getRepeat()));
+-        preferenceToSwitchKeyMap.put("press_double_beep", (switchEvent, converter) -> new KarooActionEvent(KarooAction.VIRTUAL_DOUBLE_BEEP, switchEvent.getRepeat()));
+-        preferenceToSwitchKeyMap.put("press_bell_old", (switchEvent, converter) -> new KarooActionEvent(KarooAction.VIRTUAL_BELL_OLD, switchEvent.getRepeat()));
+-        preferenceToSwitchKeyMap.put("press_bell_new", (switchEvent, converter) -> new KarooActionEvent(KarooAction.VIRTUAL_BELL_NEW, switchEvent.getRepeat()));
+-        preferenceToSwitchKeyMap.put("press_control_center", (switchEvent, converter) -> new KarooActionEvent(KarooAction.VIRTUAL_CONTROL_CENTER, switchEvent.getRepeat()));
+-        preferenceToSwitchKeyMap.put("press_drawer_action", (switchEvent, converter) -> new KarooActionEvent(KarooAction.VIRTUAL_DRAWER_ACTION, switchEvent.getRepeat()));
+-        preferenceToSwitchKeyMap.put("press_toggle_overlay", (switchEvent, converter) -> new KarooActionEvent(KarooAction.VIRTUAL_TOGGLE_OVERLAY, switchEvent.getRepeat()));
+-        preferenceToSwitchKeyMap.put("press_hide_overlay", (switchEvent, converter) -> new KarooActionEvent(KarooAction.VIRTUAL_HIDE_OVERLAY, switchEvent.getRepeat()));
+-        preferenceToSwitchKeyMap.put("press_show_overlay", (switchEvent, converter) -> new KarooActionEvent(KarooAction.VIRTUAL_SHOW_OVERLAY, switchEvent.getRepeat()));
+-
+-        /*
+-         * Double press events
+-         */
+-        preferenceToSwitchKeyMap.put("double_press_duplicate_single_press", (switchEvent, converter) ->
+-                new KarooActionEvent(converter.apply(new SwitchEvent(switchEvent.getType(), SwitchCommand.SINGLE_CLICK, switchEvent.getRepeat())), 2));
+-
+-        /*
+-         *   Hold events
+-         */
+-        preferenceToSwitchKeyMap.put("map_graph_zoom_out", (switchEvent, converter) -> {
+-            if (switchEvent.getCommand() == SwitchCommand.LONG_PRESS_UP) {
+-                return null;
+-            }
+-
+-            return new KarooActionEvent(KarooAction.VIRTUAL_ZOOM_OUT, 0);
+-        });
+-        preferenceToSwitchKeyMap.put("map_graph_zoom_in", (switchEvent, converter) -> {
+-            if (switchEvent.getCommand() == SwitchCommand.LONG_PRESS_UP) {
+-                return null;
+-            }
+-
+-            return new KarooActionEvent(KarooAction.VIRTUAL_ZOOM_IN, 0);
+-        });
+-        preferenceToSwitchKeyMap.put("hold_short_single_map_graph_zoom_out", (switchEvent, converter) -> {
+-            if (switchEvent.getCommand() != SwitchCommand.LONG_PRESS_DOWN) {
+-                return null;
+-            }
+-
+-            return new KarooActionEvent(KarooAction.VIRTUAL_ZOOM_OUT, 0);
+-        });
+-        preferenceToSwitchKeyMap.put("hold_short_single_map_graph_zoom_in", (switchEvent, converter) -> {
+-            if (switchEvent.getCommand() != SwitchCommand.LONG_PRESS_DOWN) {
+-                return null;
+-            }
+-
+-            return new KarooActionEvent(KarooAction.VIRTUAL_ZOOM_IN, 0);
+-        });
+-        preferenceToSwitchKeyMap.put("hold_short_single_control_center", (switchEvent, converter) -> {
+-            if (switchEvent.getCommand() != SwitchCommand.LONG_PRESS_DOWN) {
+-                return null;
+-            }
+-
+-            return new KarooActionEvent(KarooAction.VIRTUAL_CONTROL_CENTER, 0);
+-        });
+-        preferenceToSwitchKeyMap.put("hold_short_single_drawer_action", (switchEvent, converter) -> {
+-            if (switchEvent.getCommand() != SwitchCommand.LONG_PRESS_DOWN) {
+-                return null;
+-            }
+-
+-            return new KarooActionEvent(KarooAction.VIRTUAL_DRAWER_ACTION, 0);
+-        });
+-        preferenceToSwitchKeyMap.put("map_graph_slow_zoom_out", (switchEvent, converter) -> {
+-            if (switchEvent.getCommand() == SwitchCommand.LONG_PRESS_UP ||
+-                    (switchEvent.getCommand() == SwitchCommand.LONG_PRESS_CONTINUE && switchEvent.getRepeat() % 2 != 0)) {
+-                return null;
+-            }
+-
+-            return new KarooActionEvent(KarooAction.VIRTUAL_ZOOM_OUT, 0);
+-        });
+-        preferenceToSwitchKeyMap.put("map_graph_slow_zoom_in", (switchEvent, converter) -> {
+-            if (switchEvent.getCommand() == SwitchCommand.LONG_PRESS_UP ||
+-                    (switchEvent.getCommand() == SwitchCommand.LONG_PRESS_CONTINUE && switchEvent.getRepeat() % 2 != 0)) {
+-                return null;
+-            }
+-
+-            return new KarooActionEvent(KarooAction.VIRTUAL_ZOOM_IN, 0);
+-        });
+-        preferenceToSwitchKeyMap.put("repeat_single_press", (switchEvent, converter) -> {
+-            if (switchEvent.getCommand() == SwitchCommand.LONG_PRESS_UP) {
+-                return null;
+-            }
+-            return converter.apply(new SwitchEvent(switchEvent.getType(), SwitchCommand.SINGLE_CLICK, switchEvent.getRepeat()));
+-        });
+-        preferenceToSwitchKeyMap.put("hold_short_single_bottom_left", (switchEvent, converter) -> {
+-            if (switchEvent.getCommand() != SwitchCommand.LONG_PRESS_DOWN) {
+-                return null;
+-            }
+-            return new KarooActionEvent(KarooAction.BOTTOM_LEFT, switchEvent.getRepeat());
+-        });
+-        preferenceToSwitchKeyMap.put("hold_short_single_bottom_right", (switchEvent, converter) -> {
+-            if (switchEvent.getCommand() != SwitchCommand.LONG_PRESS_DOWN) {
+-                return null;
+-            }
+-            return new KarooActionEvent(KarooAction.BOTTOM_RIGHT, switchEvent.getRepeat());
+-        });
+-        preferenceToSwitchKeyMap.put("hold_short_single_lap", (switchEvent, converter) -> {
+-            if (switchEvent.getCommand() != SwitchCommand.LONG_PRESS_DOWN) {
+-                return null;
+-            }
+-            return new KarooActionEvent(KarooAction.VIRTUAL_LAP, switchEvent.getRepeat());
+-        });
+-        preferenceToSwitchKeyMap.put("hold_short_single_switch_to_map_page", (switchEvent, converter) -> {
+-            if (switchEvent.getCommand() != SwitchCommand.LONG_PRESS_DOWN) {
+-                return null;
+-            }
+-            return new KarooActionEvent(KarooAction.VIRTUAL_SWITCH_TO_MAP_PAGE, switchEvent.getRepeat());
+-        });
+-        preferenceToSwitchKeyMap.put("hold_short_single_turn_screen_on", (switchEvent, converter) -> {
+-            if (switchEvent.getCommand() != SwitchCommand.LONG_PRESS_DOWN) {
+-                return null;
+-            }
+-            return new KarooActionEvent(KarooAction.VIRTUAL_TURN_SCREEN_ON, switchEvent.getRepeat());
+-        });
+-        preferenceToSwitchKeyMap.put("hold_short_single_toggle_audio_alerts", (switchEvent, converter) -> {
+-            if (switchEvent.getCommand() != SwitchCommand.LONG_PRESS_DOWN) {
+-                return null;
+-            }
+-            return new KarooActionEvent(KarooAction.VIRTUAL_TOGGLE_AUDIO_ALERTS, switchEvent.getRepeat());
+-        });
+-        preferenceToSwitchKeyMap.put("hold_short_single_disable_audio_alerts", (switchEvent, converter) -> {
+-            if (switchEvent.getCommand() != SwitchCommand.LONG_PRESS_DOWN) {
+-                return null;
+-            }
+-            return new KarooActionEvent(KarooAction.VIRTUAL_DISABLE_AUDIO_ALERTS, switchEvent.getRepeat());
+-        });
+-        preferenceToSwitchKeyMap.put("hold_short_single_enable_audio_alerts", (switchEvent, converter) -> {
+-            if (switchEvent.getCommand() != SwitchCommand.LONG_PRESS_DOWN) {
+-                return null;
+-            }
+-            return new KarooActionEvent(KarooAction.VIRTUAL_ENABLE_AUDIO_ALERTS, switchEvent.getRepeat());
+-        });
+-        preferenceToSwitchKeyMap.put("hold_short_single_single_beep", (switchEvent, converter) -> {
+-            if (switchEvent.getCommand() != SwitchCommand.LONG_PRESS_DOWN) {
+-                return null;
+-            }
+-            return new KarooActionEvent(KarooAction.VIRTUAL_SINGLE_BEEP, switchEvent.getRepeat());
+-        });
+-        preferenceToSwitchKeyMap.put("hold_short_single_double_beep", (switchEvent, converter) -> {
+-            if (switchEvent.getCommand() != SwitchCommand.LONG_PRESS_DOWN) {
+-                return null;
+-            }
+-            return new KarooActionEvent(KarooAction.VIRTUAL_DOUBLE_BEEP, switchEvent.getRepeat());
+-        });
+-        preferenceToSwitchKeyMap.put("hold_continuous_single_beep", (switchEvent, converter) -> {
+-            if (switchEvent.getCommand() == SwitchCommand.LONG_PRESS_UP) {
+-                return null;
+-            }
+-            return new KarooActionEvent(KarooAction.VIRTUAL_SINGLE_BEEP, switchEvent.getRepeat());
+-        });
+-        preferenceToSwitchKeyMap.put("hold_short_single_bell_old", (switchEvent, converter) -> {
+-            if (switchEvent.getCommand() != SwitchCommand.LONG_PRESS_DOWN) {
+-                return null;
+-            }
+-            return new KarooActionEvent(KarooAction.VIRTUAL_BELL_OLD, switchEvent.getRepeat());
+-        });
+-        preferenceToSwitchKeyMap.put("hold_short_single_bell_new", (switchEvent, converter) -> {
+-            if (switchEvent.getCommand() != SwitchCommand.LONG_PRESS_DOWN) {
+-                return null;
+-            }
+-            return new KarooActionEvent(KarooAction.VIRTUAL_BELL_NEW, switchEvent.getRepeat());
+-        });
+-        preferenceToSwitchKeyMap.put("hold_continuous_bell_old", (switchEvent, converter) -> {
+-            if (switchEvent.getCommand() == SwitchCommand.LONG_PRESS_UP) {
+-                return null;
+-            }
+-            return new KarooActionEvent(KarooAction.VIRTUAL_BELL_OLD, switchEvent.getRepeat());
+-        });
+-        preferenceToSwitchKeyMap.put("hold_continuous_bell_new", (switchEvent, converter) -> {
+-            if (switchEvent.getCommand() == SwitchCommand.LONG_PRESS_UP) {
+-                return null;
+-            }
+-            return new KarooActionEvent(KarooAction.VIRTUAL_BELL_NEW, switchEvent.getRepeat());
+-        });
+-        preferenceToSwitchKeyMap.put("hold_short_single_toggle_overlay", (switchEvent, converter) -> {
+-            if (switchEvent.getCommand() != SwitchCommand.LONG_PRESS_DOWN) {
+-                return null;
+-            }
+-            return new KarooActionEvent(KarooAction.VIRTUAL_TOGGLE_OVERLAY, switchEvent.getRepeat());
+-        });
+-        preferenceToSwitchKeyMap.put("hold_short_single_hide_overlay", (switchEvent, converter) -> {
+-            if (switchEvent.getCommand() != SwitchCommand.LONG_PRESS_DOWN) {
+-                return null;
+-            }
+-            return new KarooActionEvent(KarooAction.VIRTUAL_HIDE_OVERLAY, switchEvent.getRepeat());
+-        });
+-        preferenceToSwitchKeyMap.put("hold_short_single_show_overlay", (switchEvent, converter) -> {
+-            if (switchEvent.getCommand() != SwitchCommand.LONG_PRESS_DOWN) {
+-                return null;
+-            }
+-            return new KarooActionEvent(KarooAction.VIRTUAL_SHOW_OVERLAY, switchEvent.getRepeat());
+-        });
+-        preferenceToSwitchKeyMap.put("hold_continuous_view_overlay", (switchEvent, converter) -> {
+-            if (switchEvent.getCommand() == SwitchCommand.LONG_PRESS_UP) {
+-                return new KarooActionEvent(KarooAction.VIRTUAL_HIDE_OVERLAY, switchEvent.getRepeat());
+-            }
+-
+-            return new KarooActionEvent(KarooAction.VIRTUAL_SHOW_OVERLAY, switchEvent.getRepeat());
+-        });
+-    }
+-
+-    private final SharedPreferences preferences;
+-
+-    /**
+-     * This map translates physical switch (Left, Right) commands to a preference key.
+-     */
+-    private final Map<Pair<SwitchType, SwitchCommandType>, Pair<String, String>> preferenceMap;
+-
+-    public InputManager(Context context) {
+-        this.preferences = PreferenceManager.getDefaultSharedPreferences(context);
+-
+-        this.preferenceMap = new HashMap<>();
+-        this.preferenceMap.put(new Pair<>(SwitchType.D_FLY_CH1, SwitchCommandType.SINGLE_PRESS),
+-                new Pair<>(context.getString(R.string.preference_switch_ch1_single_press), context.getString(R.string.default_preference_switch_ch1_single_press)));
+-        this.preferenceMap.put(new Pair<>(SwitchType.D_FLY_CH1, SwitchCommandType.DOUBLE_PRESS),
+-                new Pair<>(context.getString(R.string.preference_switch_ch1_double_press), context.getString(R.string.default_preference_switch_ch1_double_press)));
+-        this.preferenceMap.put(new Pair<>(SwitchType.D_FLY_CH1, SwitchCommandType.HOLD),
+-                new Pair<>(context.getString(R.string.preference_switch_ch1_hold), context.getString(R.string.default_preference_switch_ch1_hold)));
+-
+-        this.preferenceMap.put(new Pair<>(SwitchType.D_FLY_CH2, SwitchCommandType.SINGLE_PRESS),
+-                new Pair<>(context.getString(R.string.preference_switch_ch2_single_press), context.getString(R.string.default_preference_switch_ch2_single_press)));
+-        this.preferenceMap.put(new Pair<>(SwitchType.D_FLY_CH2, SwitchCommandType.DOUBLE_PRESS),
+-                new Pair<>(context.getString(R.string.preference_switch_ch2_double_press), context.getString(R.string.default_preference_switch_ch2_double_press)));
+-        this.preferenceMap.put(new Pair<>(SwitchType.D_FLY_CH2, SwitchCommandType.HOLD),
+-                new Pair<>(context.getString(R.string.preference_switch_ch2_hold), context.getString(R.string.default_preference_switch_ch2_hold)));
+-
+-        this.preferenceMap.put(new Pair<>(SwitchType.D_FLY_CH3, SwitchCommandType.SINGLE_PRESS),
+-                new Pair<>(context.getString(R.string.preference_switch_ch3_single_press), context.getString(R.string.default_preference_switch)));
+-        this.preferenceMap.put(new Pair<>(SwitchType.D_FLY_CH3, SwitchCommandType.DOUBLE_PRESS),
+-                new Pair<>(context.getString(R.string.preference_switch_ch3_double_press), context.getString(R.string.default_preference_switch)));
+-        this.preferenceMap.put(new Pair<>(SwitchType.D_FLY_CH3, SwitchCommandType.HOLD),
+-                new Pair<>(context.getString(R.string.preference_switch_ch3_hold), context.getString(R.string.default_preference_switch)));
+-
+-        this.preferenceMap.put(new Pair<>(SwitchType.D_FLY_CH4, SwitchCommandType.SINGLE_PRESS),
+-                new Pair<>(context.getString(R.string.preference_switch_ch4_single_press), context.getString(R.string.default_preference_switch)));
+-        this.preferenceMap.put(new Pair<>(SwitchType.D_FLY_CH4, SwitchCommandType.DOUBLE_PRESS),
+-                new Pair<>(context.getString(R.string.preference_switch_ch4_double_press), context.getString(R.string.default_preference_switch)));
+-        this.preferenceMap.put(new Pair<>(SwitchType.D_FLY_CH4, SwitchCommandType.HOLD),
+-                new Pair<>(context.getString(R.string.preference_switch_ch4_hold), context.getString(R.string.default_preference_switch)));
+-    }
+-
+-    @Nullable
+-    private KarooActionEvent getKarooActionEvent(SwitchEvent switchEvent) {
+-        Pair<String, String> preferencePair = preferenceMap.get(new Pair<>(switchEvent.getType(), switchEvent.getCommand().getCommandType()));
+-        if (preferencePair == null) {
+-            return null;
+-        }
+-
+-        String preference = preferences.getString(preferencePair.first, preferencePair.second);
+-        if (preference == null) {
+-            return null;
+-        }
+-
+-        BiFunction<SwitchEvent, Function<SwitchEvent, KarooActionEvent>, KarooActionEvent> keyFunction = preferenceToSwitchKeyMap.get(preference);
+-        if (keyFunction == null) {
+-            Timber.w("Invalid karoo command from combination, switch: %s, command type: %s", switchEvent.getType(), switchEvent.getCommand().getCommandType());
+-            return null;
+-        }
+-
+-        return keyFunction.apply(switchEvent, this::getKarooActionEvent);
+-    }
+-
+-    @Nullable
+-    public KarooActionEvent onSwitch(SwitchEvent switchEvent) {
+-        if (switchEvent == null) {
+-            return null;
+-        }
+-
+-        return getKarooActionEvent(switchEvent);
+-    }
+-
+-}
++        preferenceToSwitchKeyMap.put("aero_segment", (switchEvent, converter) -> new KarooActionEvent(KarooAction.VIRTUAL_AERO_SEGMENT, switchEvent.getRepeat()));
++        preferenceToSwitchKeyMap.put("fuel_log", (switchEvent, converter) -> new KarooActionEvent(KarooAction.VIRTUAL_FUEL_LOG, switchEvent.getRepeat()));
++        preferenceToSwitchKeyMap.put("press_map_graph_zoom_out", (switchEvent, converter) -> new KarooActionEvent(KarooAction.VIRTUAL_ZOOM_OUT, switchEvent.getRepeat()));
++        preferenceToSwitchKeyMap.put("press_map_graph_zoom_in", (switchEvent, converter) -> new KarooActionEvent(KarooAction.VIRTUAL_ZOOM_IN, switchEvent.getRepeat()));
++        preferenceToSwitchKeyMap.put("press_switch_to_map_page", (switchEvent, converter) -> new KarooActionEvent(KarooAction.VIRTUAL_SWITCH_TO_MAP_PAGE, switchEvent.getRepeat()));
++        preferenceToSwitchKeyMap.put("press_turn_screen_on", (switchEvent, converter) -> new KarooActionEvent(KarooAction.VIRTUAL_TURN_SCREEN_ON, switchEvent.getRepeat()));
++        preferenceToSwitchKeyMap.put("press_turn_screen_off", (switchEvent, converter) -> new KarooActionEvent(KarooAction.VIRTUAL_TURN_SCREEN_OFF, switchEvent.getRepeat()));
++        preferenceToSwitchKeyMap.put("press_toggle_audio_alerts", (switchEvent, converter) -> new KarooActionEvent(KarooAction.VIRTUAL_TOGGLE_AUDIO_ALERTS, switchEvent.getRepeat()));
++        preferenceToSwitchKeyMap.put("press_disable_audio_alerts", (switchEvent, converter) -> new KarooActionEvent(KarooAction.VIRTUAL_DISABLE_AUDIO_ALERTS, switchEvent.getRepeat()));
++        preferenceToSwitchKeyMap.put("press_enable_audio_alerts", (switchEvent, converter) -> new KarooActionEvent(KarooAction.VIRTUAL_ENABLE_AUDIO_ALERTS, switchEvent.getRepeat()));
++        preferenceToSwitchKeyMap.put("press_single_beep", (switchEvent, converter) -> new KarooActionEvent(KarooAction.VIRTUAL_SINGLE_BEEP, switchEvent.getRepeat()));
++        preferenceToSwitchKeyMap.put("press_double_beep", (switchEvent, converter) -> new KarooActionEvent(KarooAction.VIRTUAL_DOUBLE_BEEP, switchEvent.getRepeat()));
++        preferenceToSwitchKeyMap.put("press_bell_old", (switchEvent, converter) -> new KarooActionEvent(KarooAction.VIRTUAL_BELL_OLD, switchEvent.getRepeat()));
++        preferenceToSwitchKeyMap.put("press_bell_new", (switchEvent, converter) -> new KarooActionEvent(KarooAction.VIRTUAL_BELL_NEW, switchEvent.getRepeat()));
++        preferenceToSwitchKeyMap.put("press_control_center", (switchEvent, converter) -> new KarooActionEvent(KarooAction.VIRTUAL_CONTROL_CENTER, switchEvent.getRepeat()));
++        preferenceToSwitchKeyMap.put("press_drawer_action", (switchEvent, converter) -> new KarooActionEvent(KarooAction.VIRTUAL_DRAWER_ACTION, switchEvent.getRepeat()));
++        preferenceToSwitchKeyMap.put("press_toggle_overlay", (switchEvent, converter) -> new KarooActionEvent(KarooAction.VIRTUAL_TOGGLE_OVERLAY, switchEvent.getRepeat()));
++        preferenceToSwitchKeyMap.put("press_hide_overlay", (switchEvent, converter) -> new KarooActionEvent(KarooAction.VIRTUAL_HIDE_OVERLAY, switchEvent.getRepeat()));
++        preferenceToSwitchKeyMap.put("press_show_overlay", (switchEvent, converter) -> new KarooActionEvent(KarooAction.VIRTUAL_SHOW_OVERLAY, switchEvent.getRepeat()));
++
++        /*
++         * Double press events
++         */
++        preferenceToSwitchKeyMap.put("double_press_duplicate_single_press", (switchEvent, converter) ->
++                new KarooActionEvent(converter.apply(new SwitchEvent(switchEvent.getType(), SwitchCommand.SINGLE_CLICK, switchEvent.getRepeat())), 2));
++
++        /*
++         *   Hold events
++         */
++        preferenceToSwitchKeyMap.put("map_graph_zoom_out", (switchEvent, converter) -> {
++            if (switchEvent.getCommand() == SwitchCommand.LONG_PRESS_UP) {
++                return null;
++            }
++
++            return new KarooActionEvent(KarooAction.VIRTUAL_ZOOM_OUT, 0);
++        });
++        preferenceToSwitchKeyMap.put("map_graph_zoom_in", (switchEvent, converter) -> {
++            if (switchEvent.getCommand() == SwitchCommand.LONG_PRESS_UP) {
++                return null;
++            }
++
++            return new KarooActionEvent(KarooAction.VIRTUAL_ZOOM_IN, 0);
++        });
++        preferenceToSwitchKeyMap.put("hold_short_single_map_graph_zoom_out", (switchEvent, converter) -> {
++            if (switchEvent.getCommand() != SwitchCommand.LONG_PRESS_DOWN) {
++                return null;
++            }
++
++            return new KarooActionEvent(KarooAction.VIRTUAL_ZOOM_OUT, 0);
++        });
++        preferenceToSwitchKeyMap.put("hold_short_single_map_graph_zoom_in", (switchEvent, converter) -> {
++            if (switchEvent.getCommand() != SwitchCommand.LONG_PRESS_DOWN) {
++                return null;
++            }
++
++            return new KarooActionEvent(KarooAction.VIRTUAL_ZOOM_IN, 0);
++        });
++        preferenceToSwitchKeyMap.put("hold_short_single_control_center", (switchEvent, converter) -> {
++            if (switchEvent.getCommand() != SwitchCommand.LONG_PRESS_DOWN) {
++                return null;
++            }
++
++            return new KarooActionEvent(KarooAction.VIRTUAL_CONTROL_CENTER, 0);
++        });
++        preferenceToSwitchKeyMap.put("hold_short_single_drawer_action", (switchEvent, converter) -> {
++            if (switchEvent.getCommand() != SwitchCommand.LONG_PRESS_DOWN) {
++                return null;
++            }
++
++            return new KarooActionEvent(KarooAction.VIRTUAL_DRAWER_ACTION, 0);
++        });
++        preferenceToSwitchKeyMap.put("map_graph_slow_zoom_out", (switchEvent, converter) -> {
++            if (switchEvent.getCommand() == SwitchCommand.LONG_PRESS_UP ||
++                    (switchEvent.getCommand() == SwitchCommand.LONG_PRESS_CONTINUE && switchEvent.getRepeat() % 2 != 0)) {
++                return null;
++            }
++
++            return new KarooActionEvent(KarooAction.VIRTUAL_ZOOM_OUT, 0);
++        });
++        preferenceToSwitchKeyMap.put("map_graph_slow_zoom_in", (switchEvent, converter) -> {
++            if (switchEvent.getCommand() == SwitchCommand.LONG_PRESS_UP ||
++                    (switchEvent.getCommand() == SwitchCommand.LONG_PRESS_CONTINUE && switchEvent.getRepeat() % 2 != 0)) {
++                return null;
++            }
++
++            return new KarooActionEvent(KarooAction.VIRTUAL_ZOOM_IN, 0);
++        });
++        preferenceToSwitchKeyMap.put("repeat_single_press", (switchEvent, converter) -> {
++            if (switchEvent.getCommand() == SwitchCommand.LONG_PRESS_UP) {
++                return null;
++            }
++            return converter.apply(new SwitchEvent(switchEvent.getType(), SwitchCommand.SINGLE_CLICK, switchEvent.getRepeat()));
++        });
++        preferenceToSwitchKeyMap.put("hold_short_single_bottom_left", (switchEvent, converter) -> {
++            if (switchEvent.getCommand() != SwitchCommand.LONG_PRESS_DOWN) {
++                return null;
++            }
++            return new KarooActionEvent(KarooAction.BOTTOM_LEFT, switchEvent.getRepeat());
++        });
++        preferenceToSwitchKeyMap.put("hold_short_single_bottom_right", (switchEvent, converter) -> {
++            if (switchEvent.getCommand() != SwitchCommand.LONG_PRESS_DOWN) {
++                return null;
++            }
++            return new KarooActionEvent(KarooAction.BOTTOM_RIGHT, switchEvent.getRepeat());
++        });
++        preferenceToSwitchKeyMap.put("hold_short_single_lap", (switchEvent, converter) -> {
++            if (switchEvent.getCommand() != SwitchCommand.LONG_PRESS_DOWN) {
++                return null;
++            }
++            return new KarooActionEvent(KarooAction.VIRTUAL_LAP, switchEvent.getRepeat());
++        });
++        preferenceToSwitchKeyMap.put("hold_short_single_switch_to_map_page", (switchEvent, converter) -> {
++            if (switchEvent.getCommand() != SwitchCommand.LONG_PRESS_DOWN) {
++                return null;
++            }
++            return new KarooActionEvent(KarooAction.VIRTUAL_SWITCH_TO_MAP_PAGE, switchEvent.getRepeat());
++        });
++        preferenceToSwitchKeyMap.put("hold_short_single_turn_screen_on", (switchEvent, converter) -> {
++            if (switchEvent.getCommand() != SwitchCommand.LONG_PRESS_DOWN) {
++                return null;
++            }
++            return new KarooActionEvent(KarooAction.VIRTUAL_TURN_SCREEN_ON, switchEvent.getRepeat());
++        });
++        preferenceToSwitchKeyMap.put("hold_short_single_toggle_audio_alerts", (switchEvent, converter) -> {
++            if (switchEvent.getCommand() != SwitchCommand.LONG_PRESS_DOWN) {
++                return null;
++            }
++            return new KarooActionEvent(KarooAction.VIRTUAL_TOGGLE_AUDIO_ALERTS, switchEvent.getRepeat());
++        });
++        preferenceToSwitchKeyMap.put("hold_short_single_disable_audio_alerts", (switchEvent, converter) -> {
++            if (switchEvent.getCommand() != SwitchCommand.LONG_PRESS_DOWN) {
++                return null;
++            }
++            return new KarooActionEvent(KarooAction.VIRTUAL_DISABLE_AUDIO_ALERTS, switchEvent.getRepeat());
++        });
++        preferenceToSwitchKeyMap.put("hold_short_single_enable_audio_alerts", (switchEvent, converter) -> {
++            if (switchEvent.getCommand() != SwitchCommand.LONG_PRESS_DOWN) {
++                return null;
++            }
++            return new KarooActionEvent(KarooAction.VIRTUAL_ENABLE_AUDIO_ALERTS, switchEvent.getRepeat());
++        });
++        preferenceToSwitchKeyMap.put("hold_short_single_single_beep", (switchEvent, converter) -> {
++            if (switchEvent.getCommand() != SwitchCommand.LONG_PRESS_DOWN) {
++                return null;
++            }
++            return new KarooActionEvent(KarooAction.VIRTUAL_SINGLE_BEEP, switchEvent.getRepeat());
++        });
++        preferenceToSwitchKeyMap.put("hold_short_single_double_beep", (switchEvent, converter) -> {
++            if (switchEvent.getCommand() != SwitchCommand.LONG_PRESS_DOWN) {
++                return null;
++            }
++            return new KarooActionEvent(KarooAction.VIRTUAL_DOUBLE_BEEP, switchEvent.getRepeat());
++        });
++        preferenceToSwitchKeyMap.put("hold_continuous_single_beep", (switchEvent, converter) -> {
++            if (switchEvent.getCommand() == SwitchCommand.LONG_PRESS_UP) {
++                return null;
++            }
++            return new KarooActionEvent(KarooAction.VIRTUAL_SINGLE_BEEP, switchEvent.getRepeat());
++        });
++        preferenceToSwitchKeyMap.put("hold_short_single_bell_old", (switchEvent, converter) -> {
++            if (switchEvent.getCommand() != SwitchCommand.LONG_PRESS_DOWN) {
++                return null;
++            }
++            return new KarooActionEvent(KarooAction.VIRTUAL_BELL_OLD, switchEvent.getRepeat());
++        });
++        preferenceToSwitchKeyMap.put("hold_short_single_bell_new", (switchEvent, converter) -> {
++            if (switchEvent.getCommand() != SwitchCommand.LONG_PRESS_DOWN) {
++                return null;
++            }
++            return new KarooActionEvent(KarooAction.VIRTUAL_BELL_NEW, switchEvent.getRepeat());
++        });
++        preferenceToSwitchKeyMap.put("hold_continuous_bell_old", (switchEvent, converter) -> {
++            if (switchEvent.getCommand() == SwitchCommand.LONG_PRESS_UP) {
++                return null;
++            }
++            return new KarooActionEvent(KarooAction.VIRTUAL_BELL_OLD, switchEvent.getRepeat());
++        });
++        preferenceToSwitchKeyMap.put("hold_continuous_bell_new", (switchEvent, converter) -> {
++            if (switchEvent.getCommand() == SwitchCommand.LONG_PRESS_UP) {
++                return null;
++            }
++            return new KarooActionEvent(KarooAction.VIRTUAL_BELL_NEW, switchEvent.getRepeat());
++        });
++        preferenceToSwitchKeyMap.put("hold_short_single_toggle_overlay", (switchEvent, converter) -> {
++            if (switchEvent.getCommand() != SwitchCommand.LONG_PRESS_DOWN) {
++                return null;
++            }
++            return new KarooActionEvent(KarooAction.VIRTUAL_TOGGLE_OVERLAY, switchEvent.getRepeat());
++        });
++        preferenceToSwitchKeyMap.put("hold_short_single_hide_overlay", (switchEvent, converter) -> {
++            if (switchEvent.getCommand() != SwitchCommand.LONG_PRESS_DOWN) {
++                return null;
++            }
++            return new KarooActionEvent(KarooAction.VIRTUAL_HIDE_OVERLAY, switchEvent.getRepeat());
++        });
++        preferenceToSwitchKeyMap.put("hold_short_single_show_overlay", (switchEvent, converter) -> {
++            if (switchEvent.getCommand() != SwitchCommand.LONG_PRESS_DOWN) {
++                return null;
++            }
++            return new KarooActionEvent(KarooAction.VIRTUAL_SHOW_OVERLAY, switchEvent.getRepeat());
++        });
++        preferenceToSwitchKeyMap.put("hold_continuous_view_overlay", (switchEvent, converter) -> {
++            if (switchEvent.getCommand() == SwitchCommand.LONG_PRESS_UP) {
++                return new KarooActionEvent(KarooAction.VIRTUAL_HIDE_OVERLAY, switchEvent.getRepeat());
++            }
++
++            return new KarooActionEvent(KarooAction.VIRTUAL_SHOW_OVERLAY, switchEvent.getRepeat());
++        });
++    }
++
++    private final SharedPreferences preferences;
++
++    /**
++     * This map translates physical switch (Left, Right) commands to a preference key.
++     */
++    private final Map<Pair<SwitchType, SwitchCommandType>, Pair<String, String>> preferenceMap;
++
++    public InputManager(Context context) {
++        this.preferences = PreferenceManager.getDefaultSharedPreferences(context);
++
++        this.preferenceMap = new HashMap<>();
++        this.preferenceMap.put(new Pair<>(SwitchType.D_FLY_CH1, SwitchCommandType.SINGLE_PRESS),
++                new Pair<>(context.getString(R.string.preference_switch_ch1_single_press), context.getString(R.string.default_preference_switch_ch1_single_press)));
++        this.preferenceMap.put(new Pair<>(SwitchType.D_FLY_CH1, SwitchCommandType.DOUBLE_PRESS),
++                new Pair<>(context.getString(R.string.preference_switch_ch1_double_press), context.getString(R.string.default_preference_switch_ch1_double_press)));
++        this.preferenceMap.put(new Pair<>(SwitchType.D_FLY_CH1, SwitchCommandType.HOLD),
++                new Pair<>(context.getString(R.string.preference_switch_ch1_hold), context.getString(R.string.default_preference_switch_ch1_hold)));
++
++        this.preferenceMap.put(new Pair<>(SwitchType.D_FLY_CH2, SwitchCommandType.SINGLE_PRESS),
++                new Pair<>(context.getString(R.string.preference_switch_ch2_single_press), context.getString(R.string.default_preference_switch_ch2_single_press)));
++        this.preferenceMap.put(new Pair<>(SwitchType.D_FLY_CH2, SwitchCommandType.DOUBLE_PRESS),
++                new Pair<>(context.getString(R.string.preference_switch_ch2_double_press), context.getString(R.string.default_preference_switch_ch2_double_press)));
++        this.preferenceMap.put(new Pair<>(SwitchType.D_FLY_CH2, SwitchCommandType.HOLD),
++                new Pair<>(context.getString(R.string.preference_switch_ch2_hold), context.getString(R.string.default_preference_switch_ch2_hold)));
++
++        this.preferenceMap.put(new Pair<>(SwitchType.D_FLY_CH3, SwitchCommandType.SINGLE_PRESS),
++                new Pair<>(context.getString(R.string.preference_switch_ch3_single_press), context.getString(R.string.default_preference_switch)));
++        this.preferenceMap.put(new Pair<>(SwitchType.D_FLY_CH3, SwitchCommandType.DOUBLE_PRESS),
++                new Pair<>(context.getString(R.string.preference_switch_ch3_double_press), context.getString(R.string.default_preference_switch)));
++        this.preferenceMap.put(new Pair<>(SwitchType.D_FLY_CH3, SwitchCommandType.HOLD),
++                new Pair<>(context.getString(R.string.preference_switch_ch3_hold), context.getString(R.string.default_preference_switch)));
++
++        this.preferenceMap.put(new Pair<>(SwitchType.D_FLY_CH4, SwitchCommandType.SINGLE_PRESS),
++                new Pair<>(context.getString(R.string.preference_switch_ch4_single_press), context.getString(R.string.default_preference_switch)));
++        this.preferenceMap.put(new Pair<>(SwitchType.D_FLY_CH4, SwitchCommandType.DOUBLE_PRESS),
++                new Pair<>(context.getString(R.string.preference_switch_ch4_double_press), context.getString(R.string.default_preference_switch)));
++        this.preferenceMap.put(new Pair<>(SwitchType.D_FLY_CH4, SwitchCommandType.HOLD),
++                new Pair<>(context.getString(R.string.preference_switch_ch4_hold), context.getString(R.string.default_preference_switch)));
++    }
++
++    @Nullable
++    private KarooActionEvent getKarooActionEvent(SwitchEvent switchEvent) {
++        Pair<String, String> preferencePair = preferenceMap.get(new Pair<>(switchEvent.getType(), switchEvent.getCommand().getCommandType()));
++        if (preferencePair == null) {
++            return null;
++        }
++
++        String preference = preferences.getString(preferencePair.first, preferencePair.second);
++        if (preference == null) {
++            return null;
++        }
++
++        BiFunction<SwitchEvent, Function<SwitchEvent, KarooActionEvent>, KarooActionEvent> keyFunction = preferenceToSwitchKeyMap.get(preference);
++        if (keyFunction == null) {
++            Timber.w("Invalid karoo command from combination, switch: %s, command type: %s", switchEvent.getType(), switchEvent.getCommand().getCommandType());
++            return null;
++        }
++
++        return keyFunction.apply(switchEvent, this::getKarooActionEvent);
++    }
++
++    @Nullable
++    public KarooActionEvent onSwitch(SwitchEvent switchEvent) {
++        if (switchEvent == null) {
++            return null;
++        }
++
++        return getKarooActionEvent(switchEvent);
++    }
++
++}
+diff --git a/app/src/main/java/com/valterc/ki2/karoo/Ki2ExtensionContext.kt b/app/src/main/java/com/valterc/ki2/karoo/Ki2ExtensionContext.kt
+index 315bd0a..681da58 100644
+--- a/app/src/main/java/com/valterc/ki2/karoo/Ki2ExtensionContext.kt
++++ b/app/src/main/java/com/valterc/ki2/karoo/Ki2ExtensionContext.kt
+@@ -4,6 +4,8 @@ import android.content.Context
+ import com.valterc.ki2.input.ActionManager
+ import com.valterc.ki2.karoo.audio.AudioManager
+ import com.valterc.ki2.karoo.device.KarooSensorDeviceTracking
++import com.valterc.ki2.karoo.powermetrics.AeroEngine
++import com.valterc.ki2.karoo.powermetrics.FuelEngine
+ import com.valterc.ki2.karoo.service.ServiceClient
+ import com.valterc.ki2.karoo.shifting.ShiftCountHandler
+ import io.hammerhead.karooext.KarooSystemService
+@@ -16,4 +18,6 @@ class Ki2ExtensionContext(val extension: String, val context: Context) {
+     val actionManager: ActionManager = ActionManager(this)
+     val shiftCountHandler: ShiftCountHandler = ShiftCountHandler(this)
+     val karooDeviceTracking: KarooSensorDeviceTracking = KarooSensorDeviceTracking()
++    val aeroEngine: AeroEngine by lazy { AeroEngine(this) }
++    val fuelEngine: FuelEngine by lazy { FuelEngine(this) }
+ }
+\ No newline at end of file
+diff --git a/app/src/main/java/com/valterc/ki2/karoo/Ki2ExtensionService.kt b/app/src/main/java/com/valterc/ki2/karoo/Ki2ExtensionService.kt
+index 146985f..62d71e0 100644
+--- a/app/src/main/java/com/valterc/ki2/karoo/Ki2ExtensionService.kt
++++ b/app/src/main/java/com/valterc/ki2/karoo/Ki2ExtensionService.kt
+@@ -5,23 +5,32 @@ import android.content.Intent
+ import com.valterc.ki2.BuildConfig
+ import com.valterc.ki2.data.device.DeviceId
+ import com.valterc.ki2.karoo.battery.BatteryAlertHandler
++import com.valterc.ki2.karoo.datatypes.text.AeroScoreDataType
+ import com.valterc.ki2.karoo.datatypes.text.FrontGearIndexDataType
+ import com.valterc.ki2.karoo.datatypes.text.FrontGearSizeDataType
+ import com.valterc.ki2.karoo.datatypes.text.FrontShiftCountDataType
++import com.valterc.ki2.karoo.datatypes.text.FuelStateDataType
++import com.valterc.ki2.karoo.datatypes.text.FuelTimerDataType
++import com.valterc.ki2.karoo.datatypes.text.SplitPredictorDataType
++import com.valterc.ki2.karoo.datatypes.text.WindGaugeDataType
+ import com.valterc.ki2.karoo.datatypes.text.GearRatioDataType
+ import com.valterc.ki2.karoo.datatypes.text.GearsIndexDataType
+ import com.valterc.ki2.karoo.datatypes.text.GearsSizeDataType
+ import com.valterc.ki2.karoo.datatypes.text.RearGearIndexDataType
+ import com.valterc.ki2.karoo.datatypes.text.RearGearSizeDataType
+ import com.valterc.ki2.karoo.datatypes.text.RearShiftCountDataType
++import com.valterc.ki2.karoo.datatypes.text.GearInchesDataType
++import com.valterc.ki2.karoo.datatypes.text.ShiftAdviceDataType
+ import com.valterc.ki2.karoo.datatypes.text.ShiftCountDataType
+ import com.valterc.ki2.karoo.datatypes.text.ShiftingBatteryPercentageDataType
+ import com.valterc.ki2.karoo.datatypes.text.ShiftingModeDataType
++import com.valterc.ki2.karoo.datatypes.text.SpeedAtCadenceDataType
+ import com.valterc.ki2.karoo.datatypes.visual.BikeBatteryVisualDataType
+ import com.valterc.ki2.karoo.datatypes.visual.DrivetrainIndexVisualDataType
+ import com.valterc.ki2.karoo.datatypes.visual.DrivetrainSizeVisualDataType
+ import com.valterc.ki2.karoo.datatypes.visual.GearsDetailedVisualDataType
+ import com.valterc.ki2.karoo.datatypes.visual.GearsIndexVisualDataType
++import com.valterc.ki2.karoo.datatypes.visual.GearsProVisualDataType
+ import com.valterc.ki2.karoo.datatypes.visual.GearsSizeVisualDataType
+ import com.valterc.ki2.karoo.overlay.OverlayWindowHandler
+ import com.valterc.ki2.karoo.shifting.ShiftingAudioAlertHandler
+@@ -73,10 +82,19 @@ class Ki2ExtensionService : KarooExtension("ki2", BuildConfig.VERSION_NAME) {
+             ShiftCountDataType(extensionContext),
+             FrontShiftCountDataType(extensionContext),
+             RearShiftCountDataType(extensionContext),
++            GearInchesDataType(extensionContext),
++            SpeedAtCadenceDataType(extensionContext),
++            ShiftAdviceDataType(extensionContext),
++            AeroScoreDataType(extensionContext),
++            WindGaugeDataType(extensionContext),
++            FuelStateDataType(extensionContext),
++            FuelTimerDataType(extensionContext),
++            SplitPredictorDataType(extensionContext),
+ 
+             GearsIndexVisualDataType(extensionContext),
+             GearsSizeVisualDataType(extensionContext),
+             GearsDetailedVisualDataType(extensionContext),
++            GearsProVisualDataType(extensionContext),
+             DrivetrainIndexVisualDataType(extensionContext),
+             DrivetrainSizeVisualDataType(extensionContext),
+             BikeBatteryVisualDataType(extensionContext),
+diff --git a/app/src/main/java/com/valterc/ki2/karoo/datatypes/text/AeroScoreDataType.kt b/app/src/main/java/com/valterc/ki2/karoo/datatypes/text/AeroScoreDataType.kt
+new file mode 100644
+index 0000000..c8fa77f
+--- /dev/null
++++ b/app/src/main/java/com/valterc/ki2/karoo/datatypes/text/AeroScoreDataType.kt
+@@ -0,0 +1,87 @@
++package com.valterc.ki2.karoo.datatypes.text
++
++import android.content.Context
++import androidx.compose.ui.graphics.Color
++import androidx.compose.ui.unit.DpSize
++import androidx.glance.appwidget.ExperimentalGlanceRemoteViewsApi
++import androidx.glance.appwidget.GlanceRemoteViews
++import com.valterc.ki2.karoo.Ki2ExtensionContext
++import com.valterc.ki2.karoo.datatypes.views.TextView
++import io.hammerhead.karooext.extension.DataTypeImpl
++import io.hammerhead.karooext.internal.ViewEmitter
++import io.hammerhead.karooext.models.ShowCustomStreamState
++import io.hammerhead.karooext.models.UpdateGraphicConfig
++import io.hammerhead.karooext.models.ViewConfig
++import kotlinx.coroutines.CoroutineScope
++import kotlinx.coroutines.Dispatchers
++import kotlinx.coroutines.Job
++import kotlinx.coroutines.cancel
++import kotlinx.coroutines.launch
++import java.util.Locale
++import kotlin.math.abs
++
++/**
++ * Live CdA of the current aero test segment (m²), with a colored arrow versus
++ * the previous segment. Start a new segment from a Di2 switch action.
++ */
++@OptIn(ExperimentalGlanceRemoteViewsApi::class)
++class AeroScoreDataType(private val extensionContext: Ki2ExtensionContext) :
++    DataTypeImpl(extensionContext.extension, "DATATYPE_AERO_SCORE") {
++
++    private val glance = GlanceRemoteViews()
++    private var lastRendered: Pair<String, Color?>? = null
++
++    override fun startView(context: Context, config: ViewConfig, emitter: ViewEmitter) {
++        emitter.onNext(UpdateGraphicConfig(showHeader = true))
++        emitter.onNext(ShowCustomStreamState(message = "", color = null))
++
++        val viewScope = CoroutineScope(Dispatchers.IO + Job())
++        viewScope.launch {
++            emitViewUpdate(context, config, emitter)
++            extensionContext.aeroEngine.updates.collect {
++                emitViewUpdate(context, config, emitter)
++            }
++        }
++
++        emitter.setCancellable { viewScope.cancel() }
++    }
++
++    private suspend fun emitViewUpdate(context: Context, config: ViewConfig, emitter: ViewEmitter) {
++        val engine = extensionContext.aeroEngine
++        val cda = engine.currentCda()
++        val previous = engine.previousSegmentCda()
++
++        var color: Color? = null
++        val text = when {
++            cda == null && engine.sampleCount() == 0 -> "—"
++            cda == null -> "…"
++            else -> {
++                var suffix = ""
++                if (previous != null && engine.sampleCount() >= 40 && abs(cda - previous) > 0.003) {
++                    if (cda < previous) {
++                        suffix = "▼"
++                        color = COLOR_GREEN
++                    } else {
++                        suffix = "▲"
++                        color = COLOR_RED
++                    }
++                }
++                String.format(Locale.US, "%.3f%s", cda, suffix)
++            }
++        }
++
++        val rendered = text to color
++        if (rendered == lastRendered) return
++        lastRendered = rendered
++
++        val compositionResult = glance.compose(context, DpSize.Unspecified) {
++            TextView(text, dataAlignment = config.alignment, fontSize = config.textSize, textColor = color)
++        }
++        emitter.updateView(compositionResult.remoteViews)
++    }
++
++    private companion object {
++        val COLOR_GREEN = Color(0xFF34C759)
++        val COLOR_RED = Color(0xFFFF453A)
++    }
++}
+diff --git a/app/src/main/java/com/valterc/ki2/karoo/datatypes/text/FuelStateDataType.kt b/app/src/main/java/com/valterc/ki2/karoo/datatypes/text/FuelStateDataType.kt
+new file mode 100644
+index 0000000..6027df2
+--- /dev/null
++++ b/app/src/main/java/com/valterc/ki2/karoo/datatypes/text/FuelStateDataType.kt
+@@ -0,0 +1,80 @@
++package com.valterc.ki2.karoo.datatypes.text
++
++import android.content.Context
++import androidx.compose.ui.graphics.Color
++import androidx.compose.ui.unit.DpSize
++import androidx.glance.appwidget.ExperimentalGlanceRemoteViewsApi
++import androidx.glance.appwidget.GlanceRemoteViews
++import com.valterc.ki2.karoo.Ki2ExtensionContext
++import com.valterc.ki2.karoo.datatypes.views.TextView
++import io.hammerhead.karooext.extension.DataTypeImpl
++import io.hammerhead.karooext.internal.ViewEmitter
++import io.hammerhead.karooext.models.ShowCustomStreamState
++import io.hammerhead.karooext.models.UpdateGraphicConfig
++import io.hammerhead.karooext.models.ViewConfig
++import kotlinx.coroutines.CoroutineScope
++import kotlinx.coroutines.Dispatchers
++import kotlinx.coroutines.Job
++import kotlinx.coroutines.cancel
++import kotlinx.coroutines.launch
++import kotlin.math.roundToInt
++
++/**
++ * Carb balance versus the intake schedule: grams ahead (+) or behind (−).
++ * Log a portion with the mapped Di2 switch action.
++ */
++@OptIn(ExperimentalGlanceRemoteViewsApi::class)
++class FuelStateDataType(private val extensionContext: Ki2ExtensionContext) :
++    DataTypeImpl(extensionContext.extension, "DATATYPE_FUEL_STATE") {
++
++    private val glance = GlanceRemoteViews()
++    private var lastRendered: Pair<String, Color?>? = null
++
++    override fun startView(context: Context, config: ViewConfig, emitter: ViewEmitter) {
++        emitter.onNext(UpdateGraphicConfig(showHeader = true))
++        emitter.onNext(ShowCustomStreamState(message = "", color = null))
++
++        val viewScope = CoroutineScope(Dispatchers.IO + Job())
++        viewScope.launch {
++            emitViewUpdate(context, config, emitter)
++            extensionContext.fuelEngine.updates.collect {
++                emitViewUpdate(context, config, emitter)
++            }
++        }
++
++        emitter.setCancellable { viewScope.cancel() }
++    }
++
++    private suspend fun emitViewUpdate(context: Context, config: ViewConfig, emitter: ViewEmitter) {
++        val engine = extensionContext.fuelEngine
++
++        var color: Color? = null
++        val text = if (!engine.active()) {
++            "—"
++        } else {
++            val balance = engine.balanceGrams()
++            color = when {
++                balance <= -engine.portionGrams() -> COLOR_RED
++                balance >= 0 -> COLOR_GREEN
++                else -> COLOR_AMBER
++            }
++            val grams = balance.roundToInt()
++            if (grams > 0) "+${grams}g" else "${grams}g"
++        }
++
++        val rendered = text to color
++        if (rendered == lastRendered) return
++        lastRendered = rendered
++
++        val compositionResult = glance.compose(context, DpSize.Unspecified) {
++            TextView(text, dataAlignment = config.alignment, fontSize = config.textSize, textColor = color)
++        }
++        emitter.updateView(compositionResult.remoteViews)
++    }
++
++    private companion object {
++        val COLOR_GREEN = Color(0xFF34C759)
++        val COLOR_AMBER = Color(0xFFFF9F0A)
++        val COLOR_RED = Color(0xFFFF453A)
++    }
++}
+diff --git a/app/src/main/java/com/valterc/ki2/karoo/datatypes/text/FuelTimerDataType.kt b/app/src/main/java/com/valterc/ki2/karoo/datatypes/text/FuelTimerDataType.kt
+new file mode 100644
+index 0000000..4772a27
+--- /dev/null
++++ b/app/src/main/java/com/valterc/ki2/karoo/datatypes/text/FuelTimerDataType.kt
+@@ -0,0 +1,80 @@
++package com.valterc.ki2.karoo.datatypes.text
++
++import android.content.Context
++import androidx.compose.ui.graphics.Color
++import androidx.compose.ui.unit.DpSize
++import androidx.glance.appwidget.ExperimentalGlanceRemoteViewsApi
++import androidx.glance.appwidget.GlanceRemoteViews
++import com.valterc.ki2.karoo.Ki2ExtensionContext
++import com.valterc.ki2.karoo.datatypes.views.TextView
++import io.hammerhead.karooext.extension.DataTypeImpl
++import io.hammerhead.karooext.internal.ViewEmitter
++import io.hammerhead.karooext.models.ShowCustomStreamState
++import io.hammerhead.karooext.models.UpdateGraphicConfig
++import io.hammerhead.karooext.models.ViewConfig
++import kotlinx.coroutines.CoroutineScope
++import kotlinx.coroutines.Dispatchers
++import kotlinx.coroutines.Job
++import kotlinx.coroutines.cancel
++import kotlinx.coroutines.launch
++import java.util.Locale
++
++/**
++ * Countdown to the next carb portion. Shows EAT when a portion is due.
++ */
++@OptIn(ExperimentalGlanceRemoteViewsApi::class)
++class FuelTimerDataType(private val extensionContext: Ki2ExtensionContext) :
++    DataTypeImpl(extensionContext.extension, "DATATYPE_FUEL_TIMER") {
++
++    private val glance = GlanceRemoteViews()
++    private var lastRendered: Pair<String, Color?>? = null
++
++    override fun startView(context: Context, config: ViewConfig, emitter: ViewEmitter) {
++        emitter.onNext(UpdateGraphicConfig(showHeader = true))
++        emitter.onNext(ShowCustomStreamState(message = "", color = null))
++
++        val viewScope = CoroutineScope(Dispatchers.IO + Job())
++        viewScope.launch {
++            emitViewUpdate(context, config, emitter)
++            extensionContext.fuelEngine.updates.collect {
++                emitViewUpdate(context, config, emitter)
++            }
++        }
++
++        emitter.setCancellable { viewScope.cancel() }
++    }
++
++    private suspend fun emitViewUpdate(context: Context, config: ViewConfig, emitter: ViewEmitter) {
++        val engine = extensionContext.fuelEngine
++
++        var color: Color? = null
++        val text = if (!engine.active()) {
++            "—"
++        } else {
++            val seconds = engine.secondsToNextIntake()
++            if (seconds <= 0) {
++                color = COLOR_RED
++                "EAT"
++            } else {
++                if (seconds < 60) color = COLOR_AMBER
++                val minutes = (seconds / 60).toInt()
++                val secs = (seconds % 60).toInt()
++                String.format(Locale.US, "%d:%02d", minutes, secs)
++            }
++        }
++
++        val rendered = text to color
++        if (rendered == lastRendered) return
++        lastRendered = rendered
++
++        val compositionResult = glance.compose(context, DpSize.Unspecified) {
++            TextView(text, dataAlignment = config.alignment, fontSize = config.textSize, textColor = color)
++        }
++        emitter.updateView(compositionResult.remoteViews)
++    }
++
++    private companion object {
++        val COLOR_AMBER = Color(0xFFFF9F0A)
++        val COLOR_RED = Color(0xFFFF453A)
++    }
++}
+diff --git a/app/src/main/java/com/valterc/ki2/karoo/datatypes/text/GearInchesDataType.kt b/app/src/main/java/com/valterc/ki2/karoo/datatypes/text/GearInchesDataType.kt
+new file mode 100644
+index 0000000..df83c3b
+--- /dev/null
++++ b/app/src/main/java/com/valterc/ki2/karoo/datatypes/text/GearInchesDataType.kt
+@@ -0,0 +1,124 @@
++package com.valterc.ki2.karoo.datatypes.text
++
++import android.content.Context
++import androidx.compose.ui.unit.DpSize
++import androidx.glance.appwidget.ExperimentalGlanceRemoteViewsApi
++import androidx.glance.appwidget.GlanceRemoteViews
++import com.valterc.ki2.data.connection.ConnectionInfo
++import com.valterc.ki2.data.device.DeviceId
++import com.valterc.ki2.data.preferences.PreferencesView
++import com.valterc.ki2.data.preferences.device.DevicePreferencesView
++import com.valterc.ki2.data.shifting.ShiftingInfo
++import com.valterc.ki2.karoo.Ki2ExtensionContext
++import com.valterc.ki2.karoo.datatypes.views.NotAvailable
++import com.valterc.ki2.karoo.datatypes.views.TextView
++import com.valterc.ki2.karoo.datatypes.views.Waiting
++import com.valterc.ki2.karoo.shifting.GearMetrics
++import com.valterc.ki2.karoo.shifting.ShiftingGearingHelper
++import io.hammerhead.karooext.extension.DataTypeImpl
++import io.hammerhead.karooext.internal.ViewEmitter
++import io.hammerhead.karooext.models.ShowCustomStreamState
++import io.hammerhead.karooext.models.UpdateGraphicConfig
++import io.hammerhead.karooext.models.ViewConfig
++import kotlinx.coroutines.CoroutineScope
++import kotlinx.coroutines.Dispatchers
++import kotlinx.coroutines.Job
++import kotlinx.coroutines.cancel
++import kotlinx.coroutines.launch
++import java.text.DecimalFormat
++import java.util.function.BiConsumer
++import java.util.function.Consumer
++
++@OptIn(ExperimentalGlanceRemoteViewsApi::class)
++class GearInchesDataType(private val extensionContext: Ki2ExtensionContext) :
++    DataTypeImpl(extensionContext.extension, "DATATYPE_GEAR_INCHES") {
++
++    private val glance = GlanceRemoteViews()
++    private val decimalFormat = DecimalFormat("#")
++    private var connectionInfo: ConnectionInfo? = null
++    private var preferencesView: PreferencesView? = null
++    private var shiftingGearingHelper = ShiftingGearingHelper(extensionContext.context)
++
++    override fun startView(context: Context, config: ViewConfig, emitter: ViewEmitter) {
++        emitter.onNext(UpdateGraphicConfig(showHeader = true))
++        emitter.onNext(ShowCustomStreamState(message = "", color = null))
++
++        val viewScope = CoroutineScope(Dispatchers.IO + Job())
++
++        val connectionInfoListener =
++            BiConsumer<DeviceId, ConnectionInfo> { _: DeviceId, connectionInfo: ConnectionInfo ->
++                this.connectionInfo = connectionInfo
++                viewScope.launch {
++                    emitViewUpdate(context, config, emitter)
++                }
++            }
++
++        val devicePreferencesConsumer =
++            BiConsumer<DeviceId, DevicePreferencesView> { _: DeviceId, devicePreferences: DevicePreferencesView ->
++                shiftingGearingHelper.setDevicePreferences(devicePreferences)
++                viewScope.launch {
++                    emitViewUpdate(context, config, emitter)
++                }
++            }
++
++        val shiftingInfoConsumer =
++            BiConsumer<DeviceId, ShiftingInfo> { _: DeviceId, shiftingInfo: ShiftingInfo ->
++                shiftingGearingHelper.setShiftingInfo(shiftingInfo)
++                viewScope.launch {
++                    emitViewUpdate(context, config, emitter)
++                }
++            }
++
++        val preferencesConsumer =
++            Consumer<PreferencesView> { preferencesView: PreferencesView ->
++                this.preferencesView = preferencesView
++                viewScope.launch {
++                    emitViewUpdate(context, config, emitter)
++                }
++            }
++
++        extensionContext.serviceClient.registerConnectionInfoWeakListener(connectionInfoListener)
++        extensionContext.serviceClient.registerDevicePreferencesWeakListener(devicePreferencesConsumer)
++        extensionContext.serviceClient.registerShiftingInfoWeakListener(shiftingInfoConsumer)
++        extensionContext.serviceClient.registerPreferencesWeakListener(preferencesConsumer)
++
++        emitter.setCancellable {
++            viewScope.cancel()
++            extensionContext.serviceClient.unregisterConnectionInfoWeakListener(connectionInfoListener)
++            extensionContext.serviceClient.unregisterDevicePreferencesWeakListener(devicePreferencesConsumer)
++            extensionContext.serviceClient.unregisterShiftingInfoWeakListener(shiftingInfoConsumer)
++            extensionContext.serviceClient.unregisterPreferencesWeakListener(preferencesConsumer)
++        }
++    }
++
++    private suspend fun emitViewUpdate(context: Context, config: ViewConfig, emitter: ViewEmitter) {
++        val wheelCircumference = preferencesView?.getWheelCircumferenceMm(context)
++            ?: GearMetrics.DEFAULT_WHEEL_CIRCUMFERENCE_MM
++
++        val compositionResult =
++            if (connectionInfo?.isConnected == true && shiftingGearingHelper.hasGearSizes()) {
++                val gearInches = GearMetrics.gearInches(
++                    shiftingGearingHelper.frontGearTeethCount,
++                    shiftingGearingHelper.rearGearTeethCount,
++                    wheelCircumference
++                )
++                glance.compose(context, DpSize.Unspecified) {
++                    TextView(
++                        decimalFormat.format(gearInches),
++                        dataAlignment = config.alignment,
++                        fontSize = config.textSize
++                    )
++                }
++            } else if (connectionInfo?.isClosed == true) {
++                glance.compose(context, DpSize.Unspecified) {
++                    NotAvailable(dataAlignment = config.alignment)
++                }
++            } else {
++                glance.compose(context, DpSize.Unspecified) {
++                    Waiting(dataAlignment = config.alignment)
++                }
++            }
++
++        emitter.updateView(compositionResult.remoteViews)
++    }
++}
+diff --git a/app/src/main/java/com/valterc/ki2/karoo/datatypes/text/ShiftAdviceDataType.kt b/app/src/main/java/com/valterc/ki2/karoo/datatypes/text/ShiftAdviceDataType.kt
+new file mode 100644
+index 0000000..a4e83c0
+--- /dev/null
++++ b/app/src/main/java/com/valterc/ki2/karoo/datatypes/text/ShiftAdviceDataType.kt
+@@ -0,0 +1,186 @@
++package com.valterc.ki2.karoo.datatypes.text
++
++import android.content.Context
++import androidx.compose.ui.graphics.Color
++import androidx.compose.ui.unit.DpSize
++import androidx.glance.appwidget.ExperimentalGlanceRemoteViewsApi
++import androidx.glance.appwidget.GlanceRemoteViews
++import com.valterc.ki2.data.connection.ConnectionInfo
++import com.valterc.ki2.data.device.DeviceId
++import com.valterc.ki2.data.preferences.PreferencesView
++import com.valterc.ki2.data.preferences.device.DevicePreferencesView
++import com.valterc.ki2.data.shifting.ShiftingInfo
++import com.valterc.ki2.karoo.Ki2ExtensionContext
++import com.valterc.ki2.karoo.datatypes.views.NotAvailable
++import com.valterc.ki2.karoo.datatypes.views.TextView
++import com.valterc.ki2.karoo.datatypes.views.Waiting
++import com.valterc.ki2.karoo.shifting.GearMetrics
++import com.valterc.ki2.karoo.shifting.ShiftingGearingHelper
++import com.valterc.ki2.karoo.streamData
++import io.hammerhead.karooext.extension.DataTypeImpl
++import io.hammerhead.karooext.internal.ViewEmitter
++import io.hammerhead.karooext.models.DataType
++import io.hammerhead.karooext.models.ShowCustomStreamState
++import io.hammerhead.karooext.models.StreamState
++import io.hammerhead.karooext.models.UpdateGraphicConfig
++import io.hammerhead.karooext.models.ViewConfig
++import kotlinx.coroutines.CoroutineScope
++import kotlinx.coroutines.Dispatchers
++import kotlinx.coroutines.Job
++import kotlinx.coroutines.cancel
++import kotlinx.coroutines.launch
++import java.util.function.BiConsumer
++import java.util.function.Consumer
++
++/**
++ * Live shift advice based on target cadence.
++ *
++ * Shows the number of rear shifts (at current wheel speed) that would bring
++ * cadence closest to the configured target:
++ *  - "▲2": shift 2 gears harder (smaller cogs)
++ *  - "▼1": shift 1 gear easier (bigger cog)
++ *  - "✓": cadence within the target band
++ *  - "F▲"/"F▼": rear cassette exhausted, change chainring
++ *  - "–": no valid cadence (coasting or no sensor)
++ */
++@OptIn(ExperimentalGlanceRemoteViewsApi::class)
++class ShiftAdviceDataType(private val extensionContext: Ki2ExtensionContext) :
++    DataTypeImpl(extensionContext.extension, "DATATYPE_SHIFT_ADVICE") {
++
++    private val glance = GlanceRemoteViews()
++    private var lastRendered: Pair<String, Color?>? = null
++    private var connectionInfo: ConnectionInfo? = null
++    private var preferencesView: PreferencesView? = null
++    private var shiftingGearingHelper = ShiftingGearingHelper(extensionContext.context)
++    private var cadence: Double = 0.0
++
++    override fun startView(context: Context, config: ViewConfig, emitter: ViewEmitter) {
++        emitter.onNext(UpdateGraphicConfig(showHeader = true))
++        emitter.onNext(ShowCustomStreamState(message = "", color = null))
++
++        val viewScope = CoroutineScope(Dispatchers.IO + Job())
++
++        val connectionInfoListener =
++            BiConsumer<DeviceId, ConnectionInfo> { _: DeviceId, connectionInfo: ConnectionInfo ->
++                this.connectionInfo = connectionInfo
++                viewScope.launch { emitViewUpdate(context, config, emitter) }
++            }
++
++        val devicePreferencesConsumer =
++            BiConsumer<DeviceId, DevicePreferencesView> { _: DeviceId, devicePreferences: DevicePreferencesView ->
++                shiftingGearingHelper.setDevicePreferences(devicePreferences)
++                viewScope.launch { emitViewUpdate(context, config, emitter) }
++            }
++
++        val shiftingInfoConsumer =
++            BiConsumer<DeviceId, ShiftingInfo> { _: DeviceId, shiftingInfo: ShiftingInfo ->
++                shiftingGearingHelper.setShiftingInfo(shiftingInfo)
++                viewScope.launch { emitViewUpdate(context, config, emitter) }
++            }
++
++        val preferencesConsumer =
++            Consumer<PreferencesView> { preferencesView: PreferencesView ->
++                this.preferencesView = preferencesView
++                viewScope.launch { emitViewUpdate(context, config, emitter) }
++            }
++
++        extensionContext.serviceClient.registerConnectionInfoWeakListener(connectionInfoListener)
++        extensionContext.serviceClient.registerDevicePreferencesWeakListener(devicePreferencesConsumer)
++        extensionContext.serviceClient.registerShiftingInfoWeakListener(shiftingInfoConsumer)
++        extensionContext.serviceClient.registerPreferencesWeakListener(preferencesConsumer)
++
++        viewScope.launch {
++            extensionContext.karooSystem.streamData(DataType.Type.CADENCE)
++                .collect { streamState ->
++                    cadence = when (streamState) {
++                        is StreamState.Streaming -> streamState.dataPoint.singleValue ?: 0.0
++                        else -> 0.0
++                    }
++                    emitViewUpdate(context, config, emitter)
++                }
++        }
++
++        emitter.setCancellable {
++            viewScope.cancel()
++            extensionContext.serviceClient.unregisterConnectionInfoWeakListener(connectionInfoListener)
++            extensionContext.serviceClient.unregisterDevicePreferencesWeakListener(devicePreferencesConsumer)
++            extensionContext.serviceClient.unregisterShiftingInfoWeakListener(shiftingInfoConsumer)
++            extensionContext.serviceClient.unregisterPreferencesWeakListener(preferencesConsumer)
++        }
++    }
++
++    private suspend fun emitViewUpdate(context: Context, config: ViewConfig, emitter: ViewEmitter) {
++        val compositionResult =
++            if (connectionInfo?.isConnected == true && shiftingGearingHelper.hasValidGearingInfo()) {
++                val targetCadence = preferencesView?.getTargetCadence(context)
++                    ?: GearMetrics.DEFAULT_TARGET_CADENCE
++
++                val advice = GearMetrics.shiftAdvice(
++                    cadence,
++                    shiftingGearingHelper.frontGearTeethCount,
++                    shiftingGearingHelper.rearGear,
++                    shiftingGearingHelper.rearTeethByGear,
++                    targetCadence
++                )
++
++                val (text, color) = adviceDisplay(advice, targetCadence)
++                if (text to color == lastRendered) return
++                lastRendered = text to color
++
++                glance.compose(context, DpSize.Unspecified) {
++                    TextView(
++                        text,
++                        dataAlignment = config.alignment,
++                        fontSize = config.textSize,
++                        textColor = color
++                    )
++                }
++            } else if (connectionInfo?.isClosed == true) {
++                lastRendered = null
++                glance.compose(context, DpSize.Unspecified) {
++                    NotAvailable(dataAlignment = config.alignment)
++                }
++            } else {
++                lastRendered = null
++                glance.compose(context, DpSize.Unspecified) {
++                    Waiting(dataAlignment = config.alignment)
++                }
++            }
++
++        emitter.updateView(compositionResult.remoteViews)
++    }
++
++    private fun adviceDisplay(
++        advice: GearMetrics.ShiftAdvice?,
++        targetCadence: Int
++    ): Pair<String, Color?> {
++        if (advice == null) {
++            return "–" to null
++        }
++
++        if (advice.suggestFrontShift) {
++            val frontShiftUp = cadence > targetCadence
++            val frontAvailable = if (frontShiftUp) {
++                shiftingGearingHelper.frontGear < shiftingGearingHelper.frontGearMax
++            } else {
++                shiftingGearingHelper.frontGear > 1
++            }
++            if (!frontAvailable) {
++                // Gearing exhausted in this direction: nothing actionable.
++                return "–" to null
++            }
++            return (if (frontShiftUp) "F▲" else "F▼") to COLOR_AMBER
++        }
++
++        return when {
++            advice.rearDelta > 0 -> "▲${advice.rearDelta}" to COLOR_AMBER
++            advice.rearDelta < 0 -> "▼${-advice.rearDelta}" to COLOR_AMBER
++            else -> "✓" to COLOR_GREEN
++        }
++    }
++
++    private companion object {
++        val COLOR_GREEN = Color(0xFF34C759)
++        val COLOR_AMBER = Color(0xFFFF9F0A)
++    }
++}
+diff --git a/app/src/main/java/com/valterc/ki2/karoo/datatypes/text/SpeedAtCadenceDataType.kt b/app/src/main/java/com/valterc/ki2/karoo/datatypes/text/SpeedAtCadenceDataType.kt
+new file mode 100644
+index 0000000..7be9596
+--- /dev/null
++++ b/app/src/main/java/com/valterc/ki2/karoo/datatypes/text/SpeedAtCadenceDataType.kt
+@@ -0,0 +1,132 @@
++package com.valterc.ki2.karoo.datatypes.text
++
++import android.content.Context
++import androidx.compose.ui.unit.DpSize
++import androidx.glance.appwidget.ExperimentalGlanceRemoteViewsApi
++import androidx.glance.appwidget.GlanceRemoteViews
++import com.valterc.ki2.data.connection.ConnectionInfo
++import com.valterc.ki2.data.device.DeviceId
++import com.valterc.ki2.data.preferences.PreferencesView
++import com.valterc.ki2.data.preferences.device.DevicePreferencesView
++import com.valterc.ki2.data.shifting.ShiftingInfo
++import com.valterc.ki2.karoo.Ki2ExtensionContext
++import com.valterc.ki2.karoo.datatypes.views.NotAvailable
++import com.valterc.ki2.karoo.datatypes.views.TextView
++import com.valterc.ki2.karoo.datatypes.views.Waiting
++import com.valterc.ki2.karoo.shifting.GearMetrics
++import com.valterc.ki2.karoo.shifting.ShiftingGearingHelper
++import io.hammerhead.karooext.extension.DataTypeImpl
++import io.hammerhead.karooext.internal.ViewEmitter
++import io.hammerhead.karooext.models.ShowCustomStreamState
++import io.hammerhead.karooext.models.UpdateGraphicConfig
++import io.hammerhead.karooext.models.ViewConfig
++import kotlinx.coroutines.CoroutineScope
++import kotlinx.coroutines.Dispatchers
++import kotlinx.coroutines.Job
++import kotlinx.coroutines.cancel
++import kotlinx.coroutines.launch
++import java.text.DecimalFormat
++import java.util.function.BiConsumer
++import java.util.function.Consumer
++
++/**
++ * Shows the speed (km/h) that the current gear produces at the configured
++ * target cadence. Useful to judge whether the current gear can carry the
++ * effort you are aiming for.
++ */
++@OptIn(ExperimentalGlanceRemoteViewsApi::class)
++class SpeedAtCadenceDataType(private val extensionContext: Ki2ExtensionContext) :
++    DataTypeImpl(extensionContext.extension, "DATATYPE_SPEED_AT_CADENCE") {
++
++    private val glance = GlanceRemoteViews()
++    private val decimalFormat = DecimalFormat("#0.0")
++    private var connectionInfo: ConnectionInfo? = null
++    private var preferencesView: PreferencesView? = null
++    private var shiftingGearingHelper = ShiftingGearingHelper(extensionContext.context)
++
++    override fun startView(context: Context, config: ViewConfig, emitter: ViewEmitter) {
++        emitter.onNext(UpdateGraphicConfig(showHeader = true))
++        emitter.onNext(ShowCustomStreamState(message = "", color = null))
++
++        val viewScope = CoroutineScope(Dispatchers.IO + Job())
++
++        val connectionInfoListener =
++            BiConsumer<DeviceId, ConnectionInfo> { _: DeviceId, connectionInfo: ConnectionInfo ->
++                this.connectionInfo = connectionInfo
++                viewScope.launch {
++                    emitViewUpdate(context, config, emitter)
++                }
++            }
++
++        val devicePreferencesConsumer =
++            BiConsumer<DeviceId, DevicePreferencesView> { _: DeviceId, devicePreferences: DevicePreferencesView ->
++                shiftingGearingHelper.setDevicePreferences(devicePreferences)
++                viewScope.launch {
++                    emitViewUpdate(context, config, emitter)
++                }
++            }
++
++        val shiftingInfoConsumer =
++            BiConsumer<DeviceId, ShiftingInfo> { _: DeviceId, shiftingInfo: ShiftingInfo ->
++                shiftingGearingHelper.setShiftingInfo(shiftingInfo)
++                viewScope.launch {
++                    emitViewUpdate(context, config, emitter)
++                }
++            }
++
++        val preferencesConsumer =
++            Consumer<PreferencesView> { preferencesView: PreferencesView ->
++                this.preferencesView = preferencesView
++                viewScope.launch {
++                    emitViewUpdate(context, config, emitter)
++                }
++            }
++
++        extensionContext.serviceClient.registerConnectionInfoWeakListener(connectionInfoListener)
++        extensionContext.serviceClient.registerDevicePreferencesWeakListener(devicePreferencesConsumer)
++        extensionContext.serviceClient.registerShiftingInfoWeakListener(shiftingInfoConsumer)
++        extensionContext.serviceClient.registerPreferencesWeakListener(preferencesConsumer)
++
++        emitter.setCancellable {
++            viewScope.cancel()
++            extensionContext.serviceClient.unregisterConnectionInfoWeakListener(connectionInfoListener)
++            extensionContext.serviceClient.unregisterDevicePreferencesWeakListener(devicePreferencesConsumer)
++            extensionContext.serviceClient.unregisterShiftingInfoWeakListener(shiftingInfoConsumer)
++            extensionContext.serviceClient.unregisterPreferencesWeakListener(preferencesConsumer)
++        }
++    }
++
++    private suspend fun emitViewUpdate(context: Context, config: ViewConfig, emitter: ViewEmitter) {
++        val wheelCircumference = preferencesView?.getWheelCircumferenceMm(context)
++            ?: GearMetrics.DEFAULT_WHEEL_CIRCUMFERENCE_MM
++        val targetCadence = preferencesView?.getTargetCadence(context)
++            ?: GearMetrics.DEFAULT_TARGET_CADENCE
++
++        val compositionResult =
++            if (connectionInfo?.isConnected == true && shiftingGearingHelper.hasGearSizes()) {
++                val speed = GearMetrics.speedAtCadenceKmh(
++                    targetCadence.toDouble(),
++                    shiftingGearingHelper.frontGearTeethCount,
++                    shiftingGearingHelper.rearGearTeethCount,
++                    wheelCircumference
++                )
++                glance.compose(context, DpSize.Unspecified) {
++                    TextView(
++                        decimalFormat.format(speed),
++                        dataAlignment = config.alignment,
++                        fontSize = config.textSize
++                    )
++                }
++            } else if (connectionInfo?.isClosed == true) {
++                glance.compose(context, DpSize.Unspecified) {
++                    NotAvailable(dataAlignment = config.alignment)
++                }
++            } else {
++                glance.compose(context, DpSize.Unspecified) {
++                    Waiting(dataAlignment = config.alignment)
++                }
++            }
++
++        emitter.updateView(compositionResult.remoteViews)
++    }
++}
+diff --git a/app/src/main/java/com/valterc/ki2/karoo/datatypes/text/SplitPredictorDataType.kt b/app/src/main/java/com/valterc/ki2/karoo/datatypes/text/SplitPredictorDataType.kt
+new file mode 100644
+index 0000000..447a9ad
+--- /dev/null
++++ b/app/src/main/java/com/valterc/ki2/karoo/datatypes/text/SplitPredictorDataType.kt
+@@ -0,0 +1,121 @@
++package com.valterc.ki2.karoo.datatypes.text
++
++import android.content.Context
++import androidx.compose.ui.graphics.Color
++import androidx.compose.ui.unit.DpSize
++import androidx.glance.appwidget.ExperimentalGlanceRemoteViewsApi
++import androidx.glance.appwidget.GlanceRemoteViews
++import com.valterc.ki2.data.preferences.PreferencesView
++import com.valterc.ki2.karoo.Ki2ExtensionContext
++import com.valterc.ki2.karoo.datatypes.views.TextView
++import com.valterc.ki2.karoo.datatypes.views.Waiting
++import com.valterc.ki2.karoo.powermetrics.RidePhysics
++import com.valterc.ki2.karoo.streamData
++import io.hammerhead.karooext.extension.DataTypeImpl
++import io.hammerhead.karooext.internal.ViewEmitter
++import io.hammerhead.karooext.models.DataType
++import io.hammerhead.karooext.models.ShowCustomStreamState
++import io.hammerhead.karooext.models.StreamState
++import io.hammerhead.karooext.models.UpdateGraphicConfig
++import io.hammerhead.karooext.models.ViewConfig
++import kotlinx.coroutines.CoroutineScope
++import kotlinx.coroutines.Dispatchers
++import kotlinx.coroutines.Job
++import kotlinx.coroutines.cancel
++import kotlinx.coroutines.launch
++import java.util.Locale
++import java.util.function.Consumer
++
++/**
++ * Projected bike split for the configured race distance, riding the rest of it
++ * at the current Normalized Power on flat road with the calibrated CdA.
++ * Green when under the target split, red when over.
++ */
++@OptIn(ExperimentalGlanceRemoteViewsApi::class)
++class SplitPredictorDataType(private val extensionContext: Ki2ExtensionContext) :
++    DataTypeImpl(extensionContext.extension, "DATATYPE_SPLIT_PREDICTOR") {
++
++    private val glance = GlanceRemoteViews()
++    private var lastRendered: Pair<String, Color?>? = null
++
++    private var preferencesView: PreferencesView? = null
++    private var normalizedPower: Double = 0.0
++
++    override fun startView(context: Context, config: ViewConfig, emitter: ViewEmitter) {
++        emitter.onNext(UpdateGraphicConfig(showHeader = true))
++        emitter.onNext(ShowCustomStreamState(message = "", color = null))
++
++        val viewScope = CoroutineScope(Dispatchers.IO + Job())
++
++        val preferencesConsumer = Consumer<PreferencesView> { preferences ->
++            preferencesView = preferences
++            viewScope.launch { emitViewUpdate(context, config, emitter) }
++        }
++        extensionContext.serviceClient.registerPreferencesWeakListener(preferencesConsumer)
++
++        viewScope.launch {
++            extensionContext.karooSystem.streamData(DataType.Type.NORMALIZED_POWER)
++                .collect { streamState ->
++                    normalizedPower =
++                        (streamState as? StreamState.Streaming)?.dataPoint?.singleValue ?: 0.0
++                    emitViewUpdate(context, config, emitter)
++                }
++        }
++
++        emitter.setCancellable {
++            viewScope.cancel()
++            extensionContext.serviceClient.unregisterPreferencesWeakListener(preferencesConsumer)
++        }
++    }
++
++    private suspend fun emitViewUpdate(context: Context, config: ViewConfig, emitter: ViewEmitter) {
++        val preferences = preferencesView
++
++        if (preferences == null || normalizedPower < 50) {
++            val rendered: Pair<String, Color?> = "WAITING" to null
++            if (rendered == lastRendered) return
++            lastRendered = rendered
++            val waiting = glance.compose(context, DpSize.Unspecified) {
++                Waiting(dataAlignment = config.alignment)
++            }
++            emitter.updateView(waiting.remoteViews)
++            return
++        }
++        run {
++            val speed = RidePhysics.solveFlatSpeed(
++                normalizedPower,
++                preferences.getTotalMassKg(context),
++                preferences.getCrr(context),
++                preferences.getDrivetrainEfficiency(context),
++                preferences.getAirDensity(context),
++                preferences.getCalibratedCda(context)
++            )
++            val distanceMeters = preferences.getRaceDistanceKm(context) * 1000.0
++            val targetSeconds = preferences.getTargetSplitMinutes(context) * 60.0
++
++            val (text, color) = if (speed < 1.0) {
++                "…" to null
++            } else {
++                val seconds = distanceMeters / speed
++                val hours = (seconds / 3600).toInt()
++                val minutes = ((seconds % 3600) / 60).toInt()
++                val formatted = String.format(Locale.US, "%d:%02d", hours, minutes)
++                formatted to if (seconds <= targetSeconds) COLOR_GREEN else COLOR_RED
++            }
++
++            val rendered = text to color
++            if (rendered == lastRendered) return
++            lastRendered = rendered
++
++            val compositionResult = glance.compose(context, DpSize.Unspecified) {
++                TextView(text, dataAlignment = config.alignment, fontSize = config.textSize, textColor = color)
++            }
++            emitter.updateView(compositionResult.remoteViews)
++        }
++    }
++
++    private companion object {
++        val COLOR_GREEN = Color(0xFF34C759)
++        val COLOR_RED = Color(0xFFFF453A)
++    }
++}
+diff --git a/app/src/main/java/com/valterc/ki2/karoo/datatypes/text/WindGaugeDataType.kt b/app/src/main/java/com/valterc/ki2/karoo/datatypes/text/WindGaugeDataType.kt
+new file mode 100644
+index 0000000..1ba903f
+--- /dev/null
++++ b/app/src/main/java/com/valterc/ki2/karoo/datatypes/text/WindGaugeDataType.kt
+@@ -0,0 +1,74 @@
++package com.valterc.ki2.karoo.datatypes.text
++
++import android.content.Context
++import androidx.compose.ui.graphics.Color
++import androidx.compose.ui.unit.DpSize
++import androidx.glance.appwidget.ExperimentalGlanceRemoteViewsApi
++import androidx.glance.appwidget.GlanceRemoteViews
++import com.valterc.ki2.karoo.Ki2ExtensionContext
++import com.valterc.ki2.karoo.datatypes.views.TextView
++import io.hammerhead.karooext.extension.DataTypeImpl
++import io.hammerhead.karooext.internal.ViewEmitter
++import io.hammerhead.karooext.models.ShowCustomStreamState
++import io.hammerhead.karooext.models.UpdateGraphicConfig
++import io.hammerhead.karooext.models.ViewConfig
++import kotlinx.coroutines.CoroutineScope
++import kotlinx.coroutines.Dispatchers
++import kotlinx.coroutines.Job
++import kotlinx.coroutines.cancel
++import kotlinx.coroutines.launch
++import java.util.Locale
++
++/**
++ * Apparent wind component in m/s from the calibrated CdA:
++ * positive = headwind, negative = tailwind. Strongly negative while
++ * drafting — the wheel in front is your tailwind.
++ */
++@OptIn(ExperimentalGlanceRemoteViewsApi::class)
++class WindGaugeDataType(private val extensionContext: Ki2ExtensionContext) :
++    DataTypeImpl(extensionContext.extension, "DATATYPE_WIND_GAUGE") {
++
++    private val glance = GlanceRemoteViews()
++    private var lastRendered: Pair<String, Color?>? = null
++
++    override fun startView(context: Context, config: ViewConfig, emitter: ViewEmitter) {
++        emitter.onNext(UpdateGraphicConfig(showHeader = true))
++        emitter.onNext(ShowCustomStreamState(message = "", color = null))
++
++        val viewScope = CoroutineScope(Dispatchers.IO + Job())
++        viewScope.launch {
++            emitViewUpdate(context, config, emitter)
++            extensionContext.aeroEngine.updates.collect {
++                emitViewUpdate(context, config, emitter)
++            }
++        }
++
++        emitter.setCancellable { viewScope.cancel() }
++    }
++
++    private suspend fun emitViewUpdate(context: Context, config: ViewConfig, emitter: ViewEmitter) {
++        val wind = extensionContext.aeroEngine.currentWind()
++
++        val color = when {
++            wind == null -> null
++            wind >= 2.0 -> COLOR_RED
++            wind <= -2.0 -> COLOR_GREEN
++            else -> null
++        }
++        val text = if (wind == null) "…" else String.format(Locale.US, "%+.1f", wind)
++
++        val rendered = text to color
++        if (rendered == lastRendered) return
++        lastRendered = rendered
++
++        val compositionResult = glance.compose(context, DpSize.Unspecified) {
++            TextView(text, dataAlignment = config.alignment, fontSize = config.textSize, textColor = color)
++        }
++        emitter.updateView(compositionResult.remoteViews)
++    }
++
++    private companion object {
++        val COLOR_GREEN = Color(0xFF34C759)
++        val COLOR_RED = Color(0xFFFF453A)
++    }
++}
+diff --git a/app/src/main/java/com/valterc/ki2/karoo/datatypes/views/TextView.kt b/app/src/main/java/com/valterc/ki2/karoo/datatypes/views/TextView.kt
+index 5c19e64..dec72fe 100644
+--- a/app/src/main/java/com/valterc/ki2/karoo/datatypes/views/TextView.kt
++++ b/app/src/main/java/com/valterc/ki2/karoo/datatypes/views/TextView.kt
+@@ -28,6 +28,7 @@ fun TextView(
+     dataAlignment: ViewConfig.Alignment = ViewConfig.Alignment.RIGHT,
+     fontSize: Int = 50,
+     action: Action? = null,
++    textColor: Color? = null,
+ ) {
+     var boxModifier = GlanceModifier
+         .fillMaxSize()
+@@ -52,7 +53,7 @@ fun TextView(
+         Text(
+             text = text ?: "",
+             style = TextStyle(
+-                ColorProvider(Color.Black, Color.White),
++                if (textColor != null) ColorProvider(textColor, textColor) else ColorProvider(Color.Black, Color.White),
+                 fontSize = (fontSize * 0.97).sp,
+                 fontFamily = FontFamily.Monospace
+             ),
+diff --git a/app/src/main/java/com/valterc/ki2/karoo/datatypes/visual/GearsProVisualDataType.kt b/app/src/main/java/com/valterc/ki2/karoo/datatypes/visual/GearsProVisualDataType.kt
+new file mode 100644
+index 0000000..bb4dee6
+--- /dev/null
++++ b/app/src/main/java/com/valterc/ki2/karoo/datatypes/visual/GearsProVisualDataType.kt
+@@ -0,0 +1,12 @@
++package com.valterc.ki2.karoo.datatypes.visual
++
++import com.valterc.ki2.karoo.Ki2ExtensionContext
++import com.valterc.ki2.karoo.datatypes.RenderedVisualDataType
++import com.valterc.ki2.karoo.views.GearsProExtensionView
++
++@Suppress("unused")
++class GearsProVisualDataType(
++    extensionContext: Ki2ExtensionContext
++) : RenderedVisualDataType(
++    "DATATYPE_VISUAL_GEARS_PRO", extensionContext,
++    { GearsProExtensionView(extensionContext) })
+diff --git a/app/src/main/java/com/valterc/ki2/karoo/powermetrics/AeroEngine.kt b/app/src/main/java/com/valterc/ki2/karoo/powermetrics/AeroEngine.kt
+new file mode 100644
+index 0000000..0e427e1
+--- /dev/null
++++ b/app/src/main/java/com/valterc/ki2/karoo/powermetrics/AeroEngine.kt
+@@ -0,0 +1,183 @@
++package com.valterc.ki2.karoo.powermetrics
++
++import com.valterc.ki2.data.preferences.PreferencesView
++import com.valterc.ki2.karoo.Ki2ExtensionContext
++import com.valterc.ki2.karoo.streamData
++import com.valterc.ki2.karoo.streamRideState
++import io.hammerhead.karooext.models.DataType
++import io.hammerhead.karooext.models.RideState
++import io.hammerhead.karooext.models.StreamState
++import kotlinx.coroutines.CoroutineScope
++import kotlinx.coroutines.Dispatchers
++import kotlinx.coroutines.Job
++import kotlinx.coroutines.flow.MutableSharedFlow
++import kotlinx.coroutines.launch
++import java.util.ArrayDeque
++import java.util.concurrent.CopyOnWriteArrayList
++import java.util.function.Consumer
++import kotlin.math.abs
++
++/**
++ * Ride-long aero estimator.
++ *
++ * Continuously fuses power (3s), speed and grade into clean-condition CdA samples,
++ * grouped into test segments. A new segment is started from a Di2 switch action,
++ * enabling on-road A/B position testing. Also produces an apparent-wind estimate
++ * from the calibrated CdA preference.
++ */
++class AeroEngine(private val extensionContext: Ki2ExtensionContext) {
++
++    companion object {
++        private const val MIN_SPEED_MS = 6.9          // 25 km/h
++        private const val MIN_POWER_W = 80.0
++        private const val MAX_ACCEL_MS2 = 0.3
++        private const val MAX_GRADE = 0.04
++        private const val SEGMENT_SAMPLE_CAPACITY = 240
++        private const val ESTIMATE_WINDOW = 90
++        private const val WIND_WINDOW = 20
++        const val MIN_SAMPLES_FOR_ESTIMATE = 20
++    }
++
++    val updates = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
++
++    private val scope = CoroutineScope(Dispatchers.IO + Job())
++
++    private val preferencesConsumer = Consumer<PreferencesView> { preferencesView ->
++        this.preferencesView = preferencesView
++    }
++
++    @Volatile
++    private var preferencesView: PreferencesView? = null
++
++    @Volatile private var power: Double = 0.0
++    @Volatile private var speed: Double = 0.0
++    @Volatile private var grade: Double = 0.0
++
++    private var lastSpeed: Double = 0.0
++    private var lastSampleTime: Long = 0
++
++    private val segmentSamples = ArrayDeque<Double>()
++    private val windSamples = ArrayDeque<Double>()
++
++    /** Median CdA of completed segments, oldest first. */
++    val segmentHistory = CopyOnWriteArrayList<Double>()
++
++    @Volatile
++    var currentSegment: Int = 1
++        private set
++
++    init {
++        extensionContext.serviceClient.registerPreferencesWeakListener(preferencesConsumer)
++
++        scope.launch {
++            extensionContext.karooSystem.streamData(DataType.Type.SMOOTHED_3S_AVERAGE_POWER)
++                .collect { power = it.valueOrZero() }
++        }
++        scope.launch {
++            extensionContext.karooSystem.streamData(DataType.Type.SPEED)
++                .collect {
++                    speed = it.valueOrZero()
++                    onSpeedTick()
++                }
++        }
++        scope.launch {
++            extensionContext.karooSystem.streamData(DataType.Type.ELEVATION_GRADE)
++                .collect { grade = it.valueOrZero() / 100.0 }
++        }
++        scope.launch {
++            extensionContext.karooSystem.streamRideState()
++                .collect { state -> if (state is RideState.Idle) resetForNewRide() }
++        }
++    }
++
++    private fun resetForNewRide() {
++        synchronized(segmentSamples) { segmentSamples.clear() }
++        synchronized(windSamples) { windSamples.clear() }
++        segmentHistory.clear()
++        currentSegment = 1
++        updates.tryEmit(Unit)
++    }
++
++    private fun StreamState.valueOrZero(): Double =
++        (this as? StreamState.Streaming)?.dataPoint?.singleValue ?: 0.0
++
++    private fun onSpeedTick() {
++        val now = System.currentTimeMillis()
++        val dt = (now - lastSampleTime) / 1000.0
++        val previousSpeed = lastSpeed
++        lastSpeed = speed
++        lastSampleTime = now
++
++        if (dt < 0.4 || dt > 3.0) return
++
++        val accel = (speed - previousSpeed) / dt
++        val preferences = preferencesView ?: return
++
++        val massKg = preferences.getTotalMassKg(extensionContext.context)
++        val crr = preferences.getCrr(extensionContext.context)
++        val efficiency = preferences.getDrivetrainEfficiency(extensionContext.context)
++        val airDensity = preferences.getAirDensity(extensionContext.context)
++
++        // Clean-condition gating
++        if (speed < MIN_SPEED_MS || power < MIN_POWER_W ||
++            abs(accel) > MAX_ACCEL_MS2 || abs(grade) > MAX_GRADE
++        ) {
++            return
++        }
++
++        RidePhysics.cdaSample(power, speed, grade, accel, massKg, crr, efficiency, airDensity)
++            ?.let { sample ->
++                synchronized(segmentSamples) {
++                    segmentSamples.addLast(sample)
++                    while (segmentSamples.size > SEGMENT_SAMPLE_CAPACITY) segmentSamples.removeFirst()
++                }
++            }
++
++        RidePhysics.windSample(
++            power, speed, grade, accel, massKg, crr, efficiency, airDensity,
++            preferences.getCalibratedCda(extensionContext.context)
++        )?.let { wind ->
++            synchronized(windSamples) {
++                windSamples.addLast(wind)
++                while (windSamples.size > WIND_WINDOW) windSamples.removeFirst()
++            }
++        }
++
++        updates.tryEmit(Unit)
++    }
++
++    /** Number of clean samples collected in the current segment. */
++    fun sampleCount(): Int = synchronized(segmentSamples) { segmentSamples.size }
++
++    /** Rolling CdA estimate of the current segment, or null while insufficient data. */
++    fun currentCda(): Double? {
++        synchronized(segmentSamples) {
++            if (segmentSamples.size < MIN_SAMPLES_FOR_ESTIMATE) return null
++            val window = segmentSamples.toList().takeLast(ESTIMATE_WINDOW)
++            return RidePhysics.median(window)
++        }
++    }
++
++    /** CdA of the previous segment, or null when this is the first. */
++    fun previousSegmentCda(): Double? = segmentHistory.lastOrNull()
++
++    /** Apparent wind (m/s, + = headwind) or null while insufficient data. */
++    fun currentWind(): Double? {
++        synchronized(windSamples) {
++            if (windSamples.size < 8) return null
++            return RidePhysics.median(windSamples)
++        }
++    }
++
++    /**
++     * Closes the current test segment (storing its estimate when valid)
++     * and starts a new one. Bound to a Di2 switch action.
++     */
++    fun startNewSegment() {
++        currentCda()?.let { segmentHistory.add(it) }
++        synchronized(segmentSamples) { segmentSamples.clear() }
++        currentSegment += 1
++        updates.tryEmit(Unit)
++        extensionContext.audioManager.playSingleBeep()
++    }
++}
+diff --git a/app/src/main/java/com/valterc/ki2/karoo/powermetrics/FuelEngine.kt b/app/src/main/java/com/valterc/ki2/karoo/powermetrics/FuelEngine.kt
+new file mode 100644
+index 0000000..62674db
+--- /dev/null
++++ b/app/src/main/java/com/valterc/ki2/karoo/powermetrics/FuelEngine.kt
+@@ -0,0 +1,116 @@
++package com.valterc.ki2.karoo.powermetrics
++
++import com.valterc.ki2.data.preferences.PreferencesView
++import com.valterc.ki2.karoo.Ki2ExtensionContext
++import com.valterc.ki2.karoo.streamData
++import com.valterc.ki2.karoo.streamRideState
++import io.hammerhead.karooext.models.DataType
++import io.hammerhead.karooext.models.RideState
++import io.hammerhead.karooext.models.StreamState
++import kotlinx.coroutines.CoroutineScope
++import kotlinx.coroutines.Dispatchers
++import kotlinx.coroutines.Job
++import kotlinx.coroutines.delay
++import kotlinx.coroutines.flow.MutableSharedFlow
++import kotlinx.coroutines.launch
++import java.util.function.Consumer
++
++/**
++ * Carbohydrate pacing coach.
++ *
++ * Tracks ride time against a grams-per-hour target, logs intake from a Di2
++ * switch action, and raises an audio nudge when the rider falls a full
++ * portion behind schedule.
++ */
++class FuelEngine(private val extensionContext: Ki2ExtensionContext) {
++
++    val updates = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
++
++    private val scope = CoroutineScope(Dispatchers.IO + Job())
++
++    private val preferencesConsumer = Consumer<PreferencesView> { preferencesView ->
++        this.preferencesView = preferencesView
++    }
++
++    @Volatile
++    private var preferencesView: PreferencesView? = null
++
++    @Volatile
++    private var elapsedMs: Double = 0.0
++
++    @Volatile
++    var carbsEatenGrams: Double = 0.0
++        private set
++
++    private var lastNudgeTime: Long = 0
++
++    init {
++        extensionContext.serviceClient.registerPreferencesWeakListener(preferencesConsumer)
++
++        scope.launch {
++            extensionContext.karooSystem.streamData(DataType.Type.ELAPSED_TIME)
++                .collect {
++                    elapsedMs = (it as? StreamState.Streaming)?.dataPoint?.singleValue ?: elapsedMs
++                }
++        }
++        scope.launch {
++            extensionContext.karooSystem.streamRideState()
++                .collect { state ->
++                    if (state is RideState.Idle) {
++                        carbsEatenGrams = 0.0
++                        elapsedMs = 0.0
++                        lastNudgeTime = 0
++                        updates.tryEmit(Unit)
++                    }
++                }
++        }
++        scope.launch {
++            while (true) {
++                delay(if (active()) 1000 else 3000)
++                checkNudge()
++                updates.tryEmit(Unit)
++            }
++        }
++    }
++
++    private fun targetGramsPerHour(): Double =
++        preferencesView?.getCarbsTargetGramsPerHour(extensionContext.context)?.toDouble() ?: 90.0
++
++    fun portionGrams(): Double =
++        preferencesView?.getCarbsPortionGrams(extensionContext.context)?.toDouble() ?: 25.0
++
++    private fun elapsedHours(): Double = elapsedMs / 3_600_000.0
++
++    /** Grams ahead (+) or behind (−) the intake schedule. */
++    fun balanceGrams(): Double = carbsEatenGrams - targetGramsPerHour() * elapsedHours()
++
++    /** True once the ride clock is running. */
++    fun active(): Boolean = elapsedMs > 15_000
++
++    /**
++     * Seconds until the next portion is due (negative = overdue).
++     * The next portion is due when balance would reach −portion.
++     */
++    fun secondsToNextIntake(): Double {
++        val rate = targetGramsPerHour() / 3600.0
++        if (rate <= 0) return 0.0
++        return (balanceGrams() + portionGrams()) / rate
++    }
++
++    /** Logs one portion of carbs. Bound to a Di2 switch action. */
++    fun logIntake() {
++        carbsEatenGrams += portionGrams()
++        lastNudgeTime = System.currentTimeMillis()
++        updates.tryEmit(Unit)
++        extensionContext.audioManager.playSingleBeep()
++    }
++
++    private fun checkNudge() {
++        if (!active()) return
++        if (balanceGrams() > -portionGrams()) return
++        val now = System.currentTimeMillis()
++        if (now - lastNudgeTime < 5 * 60 * 1000) return
++        lastNudgeTime = now
++        extensionContext.audioManager.playDoubleBeep()
++    }
++}
+diff --git a/app/src/main/java/com/valterc/ki2/karoo/powermetrics/RidePhysics.kt b/app/src/main/java/com/valterc/ki2/karoo/powermetrics/RidePhysics.kt
+new file mode 100644
+index 0000000..e49b822
+--- /dev/null
++++ b/app/src/main/java/com/valterc/ki2/karoo/powermetrics/RidePhysics.kt
+@@ -0,0 +1,88 @@
++package com.valterc.ki2.karoo.powermetrics
++
++import kotlin.math.abs
++import kotlin.math.max
++import kotlin.math.sqrt
++
++/**
++ * Pure cycling physics used by the Aero, Wind and Split Predictor features.
++ *
++ * Model (still air unless wind is being solved):
++ *   P_wheel = eta * P_pedal
++ *   P_wheel = 0.5 * rho * CdA * vAir^2 * v  +  Crr * m * g * v  +  m * g * grade * v  +  m * a * v
++ */
++object RidePhysics {
++
++    const val GRAVITY = 9.80665
++
++    /** Non-aero power at ground speed v: rolling + gravity + acceleration. */
++    fun nonAeroPower(
++        v: Double, grade: Double, accel: Double,
++        massKg: Double, crr: Double
++    ): Double {
++        return crr * massKg * GRAVITY * v +
++                massKg * GRAVITY * grade * v +
++                massKg * accel * v
++    }
++
++    /**
++     * Single-sample CdA estimate assuming still air.
++     * Returns null when the aero share of power is non-physical.
++     */
++    fun cdaSample(
++        powerW: Double, v: Double, grade: Double, accel: Double,
++        massKg: Double, crr: Double, drivetrainEfficiency: Double, airDensity: Double
++    ): Double? {
++        if (v <= 0.5) return null
++        val aeroPower = drivetrainEfficiency * powerW - nonAeroPower(v, grade, accel, massKg, crr)
++        if (aeroPower <= 0) return null
++        val cda = aeroPower / (0.5 * airDensity * v * v * v)
++        return if (cda in 0.05..0.8) cda else null
++    }
++
++    /**
++     * Apparent-wind estimate for a known CdA.
++     * Positive = headwind component, negative = tailwind (or drafting).
++     */
++    fun windSample(
++        powerW: Double, v: Double, grade: Double, accel: Double,
++        massKg: Double, crr: Double, drivetrainEfficiency: Double,
++        airDensity: Double, cda: Double
++    ): Double? {
++        if (v <= 0.5 || cda <= 0) return null
++        val aeroPower = drivetrainEfficiency * powerW - nonAeroPower(v, grade, accel, massKg, crr)
++        val vAirSq = max(0.0, aeroPower) / (0.5 * airDensity * cda * v)
++        return sqrt(vAirSq) - v
++    }
++
++    /**
++     * Solve steady flat-road speed (m/s) for a given pedal power via Newton iteration.
++     */
++    fun solveFlatSpeed(
++        powerW: Double, massKg: Double, crr: Double,
++        drivetrainEfficiency: Double, airDensity: Double, cda: Double
++    ): Double {
++        if (powerW < 30 || cda <= 0) return 0.0
++        val pw = drivetrainEfficiency * powerW
++        val kAero = 0.5 * airDensity * cda
++        val kRoll = crr * massKg * GRAVITY
++        var v = 9.0
++        repeat(24) {
++            val f = kAero * v * v * v + kRoll * v - pw
++            val fp = 3 * kAero * v * v + kRoll
++            val step = f / fp
++            v -= step
++            if (v < 1.0) v = 1.0
++            if (abs(step) < 1e-4) return v
++        }
++        return v
++    }
++
++    /** Median of a collection; 0.0 when empty. */
++    fun median(values: Collection<Double>): Double {
++        if (values.isEmpty()) return 0.0
++        val sorted = values.sorted()
++        val mid = sorted.size / 2
++        return if (sorted.size % 2 == 1) sorted[mid] else (sorted[mid - 1] + sorted[mid]) / 2.0
++    }
++}
+diff --git a/app/src/main/java/com/valterc/ki2/karoo/shifting/GearMetrics.kt b/app/src/main/java/com/valterc/ki2/karoo/shifting/GearMetrics.kt
+new file mode 100644
+index 0000000..db2a590
+--- /dev/null
++++ b/app/src/main/java/com/valterc/ki2/karoo/shifting/GearMetrics.kt
+@@ -0,0 +1,174 @@
++package com.valterc.ki2.karoo.shifting
++
++import kotlin.math.abs
++
++/**
++ * Pure gear math: development, gear inches, speed/cadence predictions,
++ * cross-chain detection and shift advice.
++ *
++ * Conventions (matching Ki2 / Shimano Di2):
++ *  - Gear indices are 1-based.
++ *  - Higher index = harder gear, for both front (bigger ring) and rear (smaller cog).
++ *  - Teeth arrays are in gear order: element 0 corresponds to gear 1 (easiest).
++ */
++object GearMetrics {
++
++    const val DEFAULT_WHEEL_CIRCUMFERENCE_MM = 2096
++    const val DEFAULT_TARGET_CADENCE = 90
++    const val CADENCE_TOLERANCE = 4
++    const val MIN_VALID_CADENCE = 20.0
++
++    enum class CrossChainState {
++        NONE,
++        WARN,
++        SEVERE
++    }
++
++    /**
++     * Distance traveled per crank revolution, in meters.
++     */
++    fun developmentMeters(frontTeeth: Int, rearTeeth: Int, wheelCircumferenceMm: Int): Double {
++        if (frontTeeth <= 0 || rearTeeth <= 0 || wheelCircumferenceMm <= 0) {
++            return 0.0
++        }
++        return (frontTeeth.toDouble() / rearTeeth) * (wheelCircumferenceMm / 1000.0)
++    }
++
++    /**
++     * Classic gear inches: wheel diameter (inches) multiplied by gear ratio.
++     */
++    fun gearInches(frontTeeth: Int, rearTeeth: Int, wheelCircumferenceMm: Int): Double {
++        if (frontTeeth <= 0 || rearTeeth <= 0 || wheelCircumferenceMm <= 0) {
++            return 0.0
++        }
++        val wheelDiameterInches = (wheelCircumferenceMm / Math.PI) / 25.4
++        return wheelDiameterInches * frontTeeth / rearTeeth
++    }
++
++    /**
++     * Speed in km/h at a given cadence in the given gear.
++     */
++    fun speedAtCadenceKmh(
++        cadenceRpm: Double,
++        frontTeeth: Int,
++        rearTeeth: Int,
++        wheelCircumferenceMm: Int
++    ): Double {
++        if (cadenceRpm <= 0) {
++            return 0.0
++        }
++        return cadenceRpm * developmentMeters(frontTeeth, rearTeeth, wheelCircumferenceMm) * 60.0 / 1000.0
++    }
++
++    /**
++     * Detects cross-chaining.
++     *
++     * SEVERE: big ring + largest cog, or small ring + smallest cog.
++     * WARN: big ring + one of the two largest cogs, or small ring + one of the two smallest cogs.
++     */
++    fun crossChainState(
++        frontGear: Int,
++        frontGearMax: Int,
++        rearGear: Int,
++        rearGearMax: Int
++    ): CrossChainState {
++        if (frontGearMax < 2 || frontGear <= 0 || rearGear <= 0 || rearGearMax <= 0) {
++            return CrossChainState.NONE
++        }
++
++        val onBigRing = frontGear == frontGearMax
++        val onSmallRing = frontGear == 1
++
++        if (onBigRing) {
++            if (rearGear == 1) return CrossChainState.SEVERE
++            if (rearGear == 2) return CrossChainState.WARN
++        }
++
++        if (onSmallRing) {
++            if (rearGear == rearGearMax) return CrossChainState.SEVERE
++            if (rearGear == rearGearMax - 1) return CrossChainState.WARN
++        }
++
++        return CrossChainState.NONE
++    }
++
++    /**
++     * Result of shift advice computation.
++     *
++     * @param rearDelta Recommended change of rear gear index. Positive = shift to a
++     *                  harder gear (smaller cog), negative = easier (bigger cog), 0 = stay.
++     * @param predictedCadence Cadence predicted after applying the recommendation,
++     *                         assuming constant wheel speed.
++     * @param suggestFrontShift True when the cassette end is reached and cadence is
++     *                          still outside the target band, i.e. a front shift is needed.
++     */
++    data class ShiftAdvice(
++        val rearDelta: Int,
++        val predictedCadence: Double,
++        val suggestFrontShift: Boolean
++    )
++
++    /**
++     * Computes the rear-gear change (front kept constant) that would bring cadence
++     * closest to the target at the current wheel speed.
++     *
++     * @param cadenceRpm Current measured cadence.
++     * @param frontTeeth Teeth count of the current chainring.
++     * @param rearGear Current rear gear index (1-based).
++     * @param rearTeethByGear Rear teeth counts in gear order (element 0 = gear 1).
++     * @param targetCadence Target cadence.
++     * @param tolerance Acceptable deviation from target before advising a shift.
++     */
++    fun shiftAdvice(
++        cadenceRpm: Double,
++        frontTeeth: Int,
++        rearGear: Int,
++        rearTeethByGear: IntArray,
++        targetCadence: Int,
++        tolerance: Int = CADENCE_TOLERANCE
++    ): ShiftAdvice? {
++        if (cadenceRpm < MIN_VALID_CADENCE || frontTeeth <= 0 || targetCadence <= 0) {
++            return null
++        }
++        val currentIndex = rearGear - 1
++        if (currentIndex < 0 || currentIndex >= rearTeethByGear.size) {
++            return null
++        }
++        val currentRearTeeth = rearTeethByGear[currentIndex]
++        if (currentRearTeeth <= 0) {
++            return null
++        }
++
++        // Within the band already: no advice.
++        if (abs(cadenceRpm - targetCadence) <= tolerance) {
++            return ShiftAdvice(0, cadenceRpm, false)
++        }
++
++        // Wheel speed is constant; predicted cadence in gear i is proportional to its cog size.
++        var bestIndex = currentIndex
++        var bestError = abs(cadenceRpm - targetCadence)
++        var bestCadence = cadenceRpm
++
++        for (i in rearTeethByGear.indices) {
++            val teeth = rearTeethByGear[i]
++            if (teeth <= 0) {
++                continue
++            }
++            val predicted = cadenceRpm * teeth / currentRearTeeth
++            val error = abs(predicted - targetCadence)
++            if (error < bestError - 0.01) {
++                bestError = error
++                bestIndex = i
++                bestCadence = predicted
++            }
++        }
++
++        val delta = bestIndex - currentIndex
++        val stillOutsideBand = bestError > tolerance
++        // Only point at the front when the rear has nothing left to give:
++        // rider first exhausts useful rear shifts, then gets the chainring hint.
++        val suggestFront = stillOutsideBand && delta == 0
++
++        return ShiftAdvice(delta, bestCadence, suggestFront)
++    }
++}
+diff --git a/app/src/main/java/com/valterc/ki2/karoo/shifting/ShiftingGearingHelper.java b/app/src/main/java/com/valterc/ki2/karoo/shifting/ShiftingGearingHelper.java
+index d7a8bb6..2c9de8b 100644
+--- a/app/src/main/java/com/valterc/ki2/karoo/shifting/ShiftingGearingHelper.java
++++ b/app/src/main/java/com/valterc/ki2/karoo/shifting/ShiftingGearingHelper.java
+@@ -125,4 +125,42 @@ public class ShiftingGearingHelper {
+         return shiftingInfo == null ? 0 : shiftingInfo.getRearGearMax();
+     }
+ 
++    /**
++     * Rear teeth counts in gear order (element 0 = gear 1, the largest cog).
++     * Respects custom gearing preferences when enabled.
++     */
++    public int[] getRearTeethByGear() {
++        if (customGearing && customGearingRear != null) {
++            return customGearingRear;
++        }
++        if (shiftingInfo == null) {
++            return new int[0];
++        }
++        int gearCount = shiftingInfo.getRearTeethPattern().getGearCount();
++        int[] teethByGear = new int[gearCount];
++        for (int gear = 1; gear <= gearCount; gear++) {
++            teethByGear[gear - 1] = shiftingInfo.getRearTeethPattern().getTeethCount(gear);
++        }
++        return teethByGear;
++    }
++
++    /**
++     * Front teeth counts in gear order (element 0 = gear 1, the smallest ring).
++     * Respects custom gearing preferences when enabled.
++     */
++    public int[] getFrontTeethByGear() {
++        if (customGearing && customGearingFront != null) {
++            return customGearingFront;
++        }
++        if (shiftingInfo == null) {
++            return new int[0];
++        }
++        int gearCount = shiftingInfo.getFrontTeethPattern().getGearCount();
++        int[] teethByGear = new int[gearCount];
++        for (int gear = 1; gear <= gearCount; gear++) {
++            teethByGear[gear - 1] = shiftingInfo.getFrontTeethPattern().getTeethCount(gear);
++        }
++        return teethByGear;
++    }
++
+ }
+diff --git a/app/src/main/java/com/valterc/ki2/karoo/views/GearsProExtensionView.kt b/app/src/main/java/com/valterc/ki2/karoo/views/GearsProExtensionView.kt
+new file mode 100644
+index 0000000..ed50f7d
+--- /dev/null
++++ b/app/src/main/java/com/valterc/ki2/karoo/views/GearsProExtensionView.kt
+@@ -0,0 +1,351 @@
++package com.valterc.ki2.karoo.views
++
++import android.annotation.SuppressLint
++import android.text.SpannableStringBuilder
++import android.util.TypedValue
++import android.text.Spanned
++import android.text.style.ForegroundColorSpan
++import android.text.style.RelativeSizeSpan
++import android.view.LayoutInflater
++import android.view.View
++import android.widget.TextView
++import androidx.constraintlayout.widget.ConstraintLayout
++import com.valterc.ki2.R
++import com.valterc.ki2.data.connection.ConnectionInfo
++import com.valterc.ki2.data.connection.ConnectionStatus
++import com.valterc.ki2.data.device.BatteryInfo
++import com.valterc.ki2.data.device.DeviceId
++import com.valterc.ki2.data.preferences.PreferencesView
++import com.valterc.ki2.data.preferences.device.DevicePreferencesView
++import com.valterc.ki2.data.shifting.ShiftingInfo
++import com.valterc.ki2.karoo.Ki2ExtensionContext
++import com.valterc.ki2.karoo.shifting.GearMetrics
++import com.valterc.ki2.karoo.shifting.ShiftingGearingHelper
++import com.valterc.ki2.karoo.streamData
++import com.valterc.ki2.views.GearsView
++import com.valterc.ki2.views.battery.BatteryView
++import io.hammerhead.karooext.models.DataType
++import io.hammerhead.karooext.models.StreamState
++import io.hammerhead.karooext.models.ViewConfig
++import kotlinx.coroutines.CoroutineScope
++import kotlinx.coroutines.Dispatchers
++import kotlinx.coroutines.Job
++import kotlinx.coroutines.cancel
++import kotlinx.coroutines.launch
++import java.util.Locale
++import java.util.function.BiConsumer
++import java.util.function.Consumer
++
++/**
++ * "Gears Pro": a large, glanceable all-in-one gear display.
++ *
++ *  - Auto-sizing gear numerals (2 | 7), readable at speed in any field size
++ *  - Inline shift-advice chevron (▲2 / ▼1 / F▲) driven by live cadence vs target
++ *  - Teeth combination and development (36 × 19 · 8.2 m)
++ *  - Gear position bar
++ *  - Cross-chain warning: numerals and gear bar turn amber (warn) / red (severe)
++ *  - Di2 battery pill with low/critical coloring
++ */
++class GearsProExtensionView(context: Ki2ExtensionContext) : Ki2ExtensionView(context) {
++
++    private val devicePreferencesConsumer =
++        BiConsumer<DeviceId, DevicePreferencesView> { _: DeviceId?, devicePreferences: DevicePreferencesView? ->
++            shiftingGearingHelper.setDevicePreferences(devicePreferences)
++            updateView()
++        }
++
++    private val connectionInfoConsumer =
++        BiConsumer { _: DeviceId?, connectionInfo: ConnectionInfo ->
++            connectionStatus = connectionInfo.connectionStatus
++            updateView()
++        }
++
++    private val shiftingInfoConsumer =
++        BiConsumer { _: DeviceId?, shiftingInfo: ShiftingInfo? ->
++            shiftingGearingHelper.setShiftingInfo(shiftingInfo)
++            updateView()
++        }
++
++    private val batteryInfoConsumer =
++        BiConsumer { _: DeviceId?, batteryInfo: BatteryInfo? ->
++            this.batteryInfo = batteryInfo
++            updateView()
++        }
++
++    private val preferencesConsumer =
++        Consumer { preferencesView: PreferencesView? ->
++            this.preferencesView = preferencesView
++            updateView()
++        }
++
++    private val shiftingGearingHelper = ShiftingGearingHelper(context.context)
++    private var connectionStatus: ConnectionStatus? = null
++    private var batteryInfo: BatteryInfo? = null
++    private var preferencesView: PreferencesView? = null
++    private var cadence: Double = 0.0
++    private var viewScope: CoroutineScope? = null
++    private var cellWidth: Int = 0
++    private var baseMainTextSizePx: Float = 0f
++    private var lastSignature: String? = null
++
++    private var textViewWaitingForData: TextView? = null
++    private var textViewMain: TextView? = null
++    private var textViewTeeth: TextView? = null
++    private var textViewBattery: TextView? = null
++    private var batteryView: BatteryView? = null
++    private var gearsView: GearsView? = null
++
++    init {
++        serviceClient.registerDevicePreferencesWeakListener(devicePreferencesConsumer)
++        serviceClient.registerConnectionInfoWeakListener(connectionInfoConsumer)
++        serviceClient.registerShiftingInfoWeakListener(shiftingInfoConsumer)
++        serviceClient.registerBatteryInfoWeakListener(batteryInfoConsumer)
++        serviceClient.registerPreferencesWeakListener(preferencesConsumer)
++
++        val scope = CoroutineScope(Dispatchers.Main + Job())
++        viewScope = scope
++        scope.launch {
++            extensionContext.karooSystem.streamData(DataType.Type.CADENCE)
++                .collect { streamState ->
++                    cadence = when (streamState) {
++                        is StreamState.Streaming -> streamState.dataPoint.singleValue ?: 0.0
++                        else -> 0.0
++                    }
++                    updateView()
++                }
++        }
++    }
++
++    override fun dispose() {
++        super.dispose()
++        viewScope?.cancel()
++        viewScope = null
++        serviceClient.unregisterDevicePreferencesWeakListener(devicePreferencesConsumer)
++        serviceClient.unregisterConnectionInfoWeakListener(connectionInfoConsumer)
++        serviceClient.unregisterShiftingInfoWeakListener(shiftingInfoConsumer)
++        serviceClient.unregisterBatteryInfoWeakListener(batteryInfoConsumer)
++        serviceClient.unregisterPreferencesWeakListener(preferencesConsumer)
++    }
++
++    @SuppressLint("InflateParams")
++    override fun createView(layoutInflater: LayoutInflater, viewConfig: ViewConfig): View {
++        val inflatedView = layoutInflater.inflate(R.layout.view_karoo_gears_pro, null)
++
++        val params = ConstraintLayout.LayoutParams(
++            ConstraintLayout.LayoutParams.MATCH_CONSTRAINT,
++            ConstraintLayout.LayoutParams.MATCH_CONSTRAINT
++        )
++        params.matchConstraintMinWidth = viewConfig.viewSize.first
++        params.matchConstraintMinHeight = viewConfig.viewSize.second
++
++        inflatedView.layoutParams = params
++        inflatedView.forceLayout()
++        inflatedView.measure(
++            View.MeasureSpec.makeMeasureSpec(viewConfig.viewSize.first, View.MeasureSpec.EXACTLY),
++            View.MeasureSpec.makeMeasureSpec(viewConfig.viewSize.second, View.MeasureSpec.EXACTLY)
++        )
++        inflatedView.layout(0, 0, inflatedView.measuredWidth, inflatedView.measuredHeight)
++
++        textViewWaitingForData =
++            inflatedView.findViewById(R.id.textview_karoo_gears_pro_waiting_for_data)
++        textViewMain = inflatedView.findViewById(R.id.textview_karoo_gears_pro_main)
++        textViewTeeth = inflatedView.findViewById(R.id.textview_karoo_gears_pro_teeth)
++        textViewBattery = inflatedView.findViewById(R.id.textview_karoo_gears_pro_battery)
++        batteryView = inflatedView.findViewById(R.id.batteryview_karoo_gears_pro)
++        gearsView = inflatedView.findViewById(R.id.gearsview_karoo_gears_pro)
++
++        // Deterministic text sizing from the actual field cell height:
++        // clean and readable at every field size, independent of autosize machinery.
++        val cellHeight = viewConfig.viewSize.second.toFloat()
++        cellWidth = viewConfig.viewSize.first
++        baseMainTextSizePx = (cellHeight * 0.40f).coerceAtLeast(24f)
++        textViewMain?.setTextSize(TypedValue.COMPLEX_UNIT_PX, baseMainTextSizePx)
++        textViewTeeth?.setTextSize(TypedValue.COMPLEX_UNIT_PX, (cellHeight * 0.15f).coerceIn(14f, 40f))
++
++        if (karooTheme == KarooTheme.WHITE) {
++            textViewWaitingForData?.setTextColor(context.getColor(R.color.hh_black))
++            textViewMain?.setTextColor(context.getColor(R.color.hh_black))
++            gearsView?.setUnselectedGearBorderColor(context.getColor(R.color.hh_gears_border_light))
++            gearsView?.setSelectedGearColor(context.getColor(R.color.hh_gears_active_light))
++        } else {
++            textViewWaitingForData?.setTextColor(context.getColor(R.color.white))
++            textViewMain?.setTextColor(context.getColor(R.color.white))
++            gearsView?.setUnselectedGearBorderColor(context.getColor(R.color.hh_gears_border_dark))
++            gearsView?.setSelectedGearColor(context.getColor(R.color.hh_gears_active_dark))
++        }
++
++        updateView()
++        return inflatedView
++    }
++
++    private fun updateView() {
++        val gearsView = gearsView ?: return
++        val textViewMain = textViewMain ?: return
++        val textViewTeeth = textViewTeeth ?: return
++        val textViewBattery = textViewBattery ?: return
++        val batteryView = batteryView ?: return
++        val textViewWaitingForData = textViewWaitingForData ?: return
++        val preferencesView = preferencesView
++
++        // ---- Gather everything first (no view mutation yet) ----
++        val waiting = connectionStatus != ConnectionStatus.ESTABLISHED ||
++                shiftingGearingHelper.hasInvalidGearingInfo() || preferencesView == null
++
++        if (waiting) {
++            if (lastSignature == "WAITING") return
++            lastSignature = "WAITING"
++            gearsView.visibility = View.INVISIBLE
++            textViewMain.visibility = View.INVISIBLE
++            textViewTeeth.visibility = View.INVISIBLE
++            textViewBattery.visibility = View.INVISIBLE
++            batteryView.visibility = View.INVISIBLE
++            textViewWaitingForData.visibility = View.VISIBLE
++            viewUpdated()
++            return
++        }
++        requireNotNull(preferencesView)
++
++        val frontGear = shiftingGearingHelper.frontGear
++        val frontGearMax = shiftingGearingHelper.frontGearMax
++        val rearGear = shiftingGearingHelper.rearGear
++        val rearGearMax = shiftingGearingHelper.rearGearMax
++        val targetCadence = preferencesView.getTargetCadence(context)
++
++        val crossChain =
++            GearMetrics.crossChainState(frontGear, frontGearMax, rearGear, rearGearMax)
++
++        val advice = GearMetrics.shiftAdvice(
++            cadence,
++            shiftingGearingHelper.frontGearTeethCount,
++            rearGear,
++            shiftingGearingHelper.rearTeethByGear,
++            targetCadence
++        )
++        val frontShiftUp = cadence > targetCadence
++        val frontAvailable = if (frontShiftUp) frontGear < frontGearMax else frontGear > 1
++        val adviceText = when {
++            advice == null -> null
++            advice.suggestFrontShift && frontAvailable -> if (frontShiftUp) "F\u25b2" else "F\u25bc"
++            advice.rearDelta > 0 -> "\u25b2${advice.rearDelta}"
++            advice.rearDelta < 0 -> "\u25bc${-advice.rearDelta}"
++            else -> null
++        }
++
++        val teethText = if (shiftingGearingHelper.hasGearSizes()) {
++            val development = GearMetrics.developmentMeters(
++                shiftingGearingHelper.frontGearTeethCount,
++                shiftingGearingHelper.rearGearTeethCount,
++                preferencesView.getWheelCircumferenceMm(context)
++            )
++            String.format(
++                Locale.getDefault(),
++                "%d \u00d7 %d  \u00b7  %.1f m",
++                shiftingGearingHelper.frontGearTeethCount,
++                shiftingGearingHelper.rearGearTeethCount,
++                development
++            )
++        } else {
++            ""
++        }
++
++        val batteryValue = batteryInfo?.value
++
++        // ---- Skip the redraw entirely when nothing visible changed ----
++        val signature =
++            "$frontGear/$frontGearMax|$rearGear/$rearGearMax|$crossChain|$adviceText|$teethText|$batteryValue"
++        if (signature == lastSignature) return
++        lastSignature = signature
++
++        // ---- Mutate views ----
++        textViewWaitingForData.visibility = View.INVISIBLE
++        gearsView.visibility = View.VISIBLE
++        textViewMain.visibility = View.VISIBLE
++        textViewTeeth.visibility = View.VISIBLE
++
++        gearsView.setGears(frontGearMax, frontGear, rearGearMax, rearGear)
++
++        val defaultNumeralColor = if (karooTheme == KarooTheme.WHITE) {
++            context.getColor(R.color.hh_black)
++        } else {
++            context.getColor(R.color.white)
++        }
++        val numeralColor = when (crossChain) {
++            GearMetrics.CrossChainState.SEVERE -> context.getColor(R.color.hh_red_600)
++            GearMetrics.CrossChainState.WARN -> context.getColor(R.color.hh_yellow_darker)
++            GearMetrics.CrossChainState.NONE -> defaultNumeralColor
++        }
++        gearsView.selectedGearColor = when (crossChain) {
++            GearMetrics.CrossChainState.SEVERE -> context.getColor(R.color.hh_red_600)
++            GearMetrics.CrossChainState.WARN -> context.getColor(R.color.hh_yellow_darker)
++            GearMetrics.CrossChainState.NONE -> preferencesView.getAccentColor(context, karooTheme)
++        }
++
++        val separatorColor = context.getColor(R.color.hh_light_grey)
++        val adviceColor = context.getColor(R.color.hh_yellow_darker)
++        val main = SpannableStringBuilder()
++
++        var start = main.length
++        main.append(frontGear.toString())
++        main.setSpan(ForegroundColorSpan(numeralColor), start, main.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
++
++        start = main.length
++        main.append(" | ")
++        main.setSpan(ForegroundColorSpan(separatorColor), start, main.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
++        main.setSpan(RelativeSizeSpan(0.6f), start, main.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
++
++        start = main.length
++        main.append(rearGear.toString())
++        main.setSpan(ForegroundColorSpan(numeralColor), start, main.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
++
++        if (adviceText != null) {
++            start = main.length
++            main.append("  ").append(adviceText)
++            main.setSpan(ForegroundColorSpan(adviceColor), start, main.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
++            main.setSpan(RelativeSizeSpan(0.55f), start, main.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
++        }
++
++        // Fit-to-width: start from the base size, shrink only when needed.
++        textViewMain.setTextSize(TypedValue.COMPLEX_UNIT_PX, baseMainTextSizePx)
++        textViewMain.text = main
++        if (cellWidth > 0) {
++            val needed = textViewMain.paint.measureText(main.toString())
++            val maxWidth = cellWidth * 0.92f
++            if (needed > maxWidth) {
++                textViewMain.setTextSize(
++                    TypedValue.COMPLEX_UNIT_PX,
++                    baseMainTextSizePx * maxWidth / needed
++                )
++            }
++        }
++
++        textViewTeeth.text = teethText
++
++        // Di2 battery pill
++        batteryInfo?.let { batteryInfo ->
++            batteryView.visibility = View.VISIBLE
++            textViewBattery.visibility = View.VISIBLE
++            batteryView.value = batteryInfo.value.toFloat() / 100
++            textViewBattery.text =
++                context.getString(R.string.text_param_percentage, batteryInfo.value)
++
++            val criticalBatteryLevel = preferencesView.getBatteryLevelCritical(context)
++            val lowBatteryLevel = preferencesView.getBatteryLevelLow(context)
++
++            if (criticalBatteryLevel != null && batteryInfo.value <= criticalBatteryLevel) {
++                batteryView.setForegroundColor(context.getColor(R.color.hh_red))
++                batteryView.setBorderColor(context.getColor(R.color.hh_red))
++            } else if (lowBatteryLevel != null && batteryInfo.value <= lowBatteryLevel) {
++                batteryView.setForegroundColor(context.getColor(R.color.hh_yellow_darker))
++                batteryView.setBorderColor(context.getColor(R.color.hh_yellow_darker))
++            } else {
++                batteryView.setForegroundColor(context.getColor(R.color.hh_success_green_600))
++                batteryView.setBorderColor(context.getColor(R.color.hh_success_green_600))
++            }
++        } ?: run {
++            batteryView.visibility = View.INVISIBLE
++            textViewBattery.visibility = View.INVISIBLE
++        }
++
++        viewUpdated()
++    }
++}
+diff --git a/app/src/main/res/layout/view_karoo_gears_pro.xml b/app/src/main/res/layout/view_karoo_gears_pro.xml
+new file mode 100644
+index 0000000..760a62b
+--- /dev/null
++++ b/app/src/main/res/layout/view_karoo_gears_pro.xml
+@@ -0,0 +1,113 @@
++<?xml version="1.0" encoding="utf-8"?>
++<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
++    xmlns:app="http://schemas.android.com/apk/res-auto"
++    xmlns:tools="http://schemas.android.com/tools"
++    android:layout_width="match_parent"
++    android:layout_height="match_parent"
++    android:layout_marginTop="4dp"
++    android:layout_marginBottom="6dp"
++    tools:background="@color/black">
++
++    <androidx.appcompat.widget.LinearLayoutCompat
++        android:id="@+id/layout_karoo_gears_pro_battery"
++        android:layout_width="wrap_content"
++        android:layout_height="wrap_content"
++        android:layout_marginEnd="6dp"
++        android:gravity="center_vertical"
++        android:orientation="horizontal"
++        app:layout_constraintEnd_toEndOf="parent"
++        app:layout_constraintTop_toTopOf="parent">
++
++        <com.valterc.ki2.views.battery.BatteryView
++            android:id="@+id/batteryview_karoo_gears_pro"
++            android:layout_width="10dp"
++            android:layout_height="17dp"
++            app:borderColor="@color/hh_green"
++            app:borderStrokeWidth="3"
++            app:foregroundColor="@color/hh_green"
++            app:orientation="vertical_top"
++            tools:value=".7" />
++
++        <TextView
++            android:id="@+id/textview_karoo_gears_pro_battery"
++            android:layout_width="wrap_content"
++            android:layout_height="wrap_content"
++            android:layout_marginStart="4dp"
++            android:fontFamily="ibm-plex-sans-condensed"
++            android:includeFontPadding="false"
++            android:textColor="@color/hh_light_grey"
++            android:textSize="15sp"
++            tools:fontFamily="sans-serif-condensed"
++            tools:text="72%" />
++
++    </androidx.appcompat.widget.LinearLayoutCompat>
++
++    <androidx.appcompat.widget.LinearLayoutCompat
++        android:id="@+id/layout_karoo_gears_pro_content"
++        android:layout_width="match_parent"
++        android:layout_height="match_parent"
++        android:orientation="vertical"
++        android:paddingHorizontal="4dp"
++        app:layout_constraintBottom_toBottomOf="parent"
++        app:layout_constraintLeft_toLeftOf="parent"
++        app:layout_constraintTop_toTopOf="parent">
++
++        <androidx.appcompat.widget.AppCompatTextView
++            android:id="@+id/textview_karoo_gears_pro_main"
++            android:layout_width="match_parent"
++            android:layout_height="0dp"
++            android:layout_weight="1"
++            android:fontFamily="ibm-plex-sans-condensed"
++            android:gravity="center"
++            android:includeFontPadding="false"
++            android:maxLines="1"
++            android:textColor="@color/white_100"
++            android:textSize="40sp"
++            android:textStyle="bold"
++            tools:fontFamily="sans-serif-condensed"
++            tools:text="2 | 7  ▲2" />
++
++        <androidx.appcompat.widget.AppCompatTextView
++            android:id="@+id/textview_karoo_gears_pro_teeth"
++            android:layout_width="match_parent"
++            android:layout_height="0dp"
++            android:layout_weight="0.32"
++            android:fontFamily="ibm-plex-sans-condensed"
++            android:gravity="center"
++            android:includeFontPadding="false"
++            android:maxLines="1"
++            android:textColor="@color/hh_light_grey"
++            android:textSize="16sp"
++            tools:fontFamily="sans-serif-condensed"
++            tools:text="36 × 19  ·  8.2 m" />
++
++        <com.valterc.ki2.views.GearsView
++            android:id="@+id/gearsview_karoo_gears_pro"
++            android:layout_width="match_parent"
++            android:layout_height="0dp"
++            android:layout_marginTop="2dp"
++            android:layout_weight="0.55"
++            android:textColor="@color/white_100"
++            app:selectedGearColor="@color/hh_gears_active_dark"
++            app:textEnabled="false"
++            app:unselectedGearBorderColor="@color/hh_light_grey"
++            tools:layout_height="60dp" />
++
++    </androidx.appcompat.widget.LinearLayoutCompat>
++
++    <TextView
++        android:id="@+id/textview_karoo_gears_pro_waiting_for_data"
++        android:layout_width="match_parent"
++        android:layout_height="wrap_content"
++        android:text="@string/text_waiting_for_data"
++        android:textAlignment="center"
++        android:textColor="@color/white_100"
++        android:textSize="24sp"
++        android:visibility="gone"
++        app:layout_constraintBottom_toBottomOf="parent"
++        app:layout_constraintLeft_toLeftOf="parent"
++        app:layout_constraintRight_toRightOf="parent"
++        app:layout_constraintTop_toTopOf="parent"
++        tools:visibility="visible" />
++
++</androidx.constraintlayout.widget.ConstraintLayout>
+diff --git a/app/src/main/res/values/arrays.xml b/app/src/main/res/values/arrays.xml
+index 7546074..627e706 100644
+--- a/app/src/main/res/values/arrays.xml
++++ b/app/src/main/res/values/arrays.xml
+@@ -23,6 +23,8 @@
+         <item>Bell (new)</item>
+         <item>Control Center</item>
+         <item>Drawer</item>
++    <item>Aero: New Segment</item>
++        <item>Fuel: Log Intake</item>
+     </string-array>
+ 
+     <string-array name="preference_values_switch_single_press_action">
+@@ -49,6 +51,8 @@
+         <item>press_bell_new</item>
+         <item>press_control_center</item>
+         <item>press_drawer_action</item>
++    <item>aero_segment</item>
++        <item>fuel_log</item>
+     </string-array>
+ 
+     <string-array name="preference_titles_switch_double_press_action">
+@@ -76,6 +80,8 @@
+         <item>Bell (new)</item>
+         <item>Control Center</item>
+         <item>Drawer</item>
++    <item>Aero: New Segment</item>
++        <item>Fuel: Log Intake</item>
+     </string-array>
+ 
+     <string-array name="preference_values_switch_double_press_action">
+@@ -103,6 +109,8 @@
+         <item>press_bell_new</item>
+         <item>press_control_center</item>
+         <item>press_drawer_action</item>
++    <item>aero_segment</item>
++        <item>fuel_log</item>
+     </string-array>
+ 
+     <string-array name="preference_titles_switch_hold_action">
+@@ -135,6 +143,8 @@
+         <item>Continuous Single Beep</item>
+         <item>Continuous Bell (old)</item>
+         <item>Continuous Bell (new)</item>
++    <item>Aero: New Segment</item>
++        <item>Fuel: Log Intake</item>
+     </string-array>
+ 
+     <string-array name="preference_values_switch_hold_action">
+@@ -167,6 +177,8 @@
+         <item>hold_continuous_single_beep</item>
+         <item>hold_continuous_bell_old</item>
+         <item>hold_continuous_bell_new</item>
++    <item>aero_segment</item>
++        <item>fuel_log</item>
+     </string-array>
+ 
+     <string-array name="preference_titles_battery_level_low">
+diff --git a/app/src/main/res/values/preferences_global.xml b/app/src/main/res/values/preferences_global.xml
+index 7b8cd09..e83eb88 100644
+--- a/app/src/main/res/values/preferences_global.xml
++++ b/app/src/main/res/values/preferences_global.xml
+@@ -1,139 +1,189 @@
+-<?xml version="1.0" encoding="utf-8"?>
+-<resources>
+-
+-    <string name="category_preference_switches">Switches</string>
+-    <string name="category_preference_switch_preferences">Switch preferences</string>
+-    <string name="category_preference_switch_ch1">D-Fly Ch. 1</string>
+-    <string name="category_preference_switch_ch2">D-Fly Ch. 2</string>
+-    <string name="category_preference_switch_ch3">D-Fly Ch. 3</string>
+-    <string name="category_preference_switch_ch4">D-Fly Ch. 4</string>
+-    <string name="category_preference_ant_recording">ANT Recording</string>
+-    <string name="category_preference_battery">Battery</string>
+-    <string name="category_preference_battery_notification">Battery Notification</string>
+-    <string name="category_preference_update">Update</string>
+-    <string name="category_preference_audio_alerts">Audio Alerts</string>
+-    <string name="category_preference_audio_alert_settings">Audio Alert Settings</string>
+-    <string name="category_preference_general_settings">General Settings</string>
+-    <string name="category_preference_overlay">Overlay</string>
+-    <string name="category_preference_secondary_overlay">Secondary overlay</string>
+-    <string name="category_preference_graphics">Graphics</string>
+-
+-    <string name="title_preference_switch_single_press">Single Press</string>
+-    <string name="title_preference_switch_double_press">Double Press</string>
+-    <string name="title_preference_switch_hold">Hold</string>
+-    <string name="title_preference_ant_recording">Record ANT communication</string>
+-    <string name="title_preference_battery_level_low">Battery low</string>
+-    <string name="title_preference_battery_level_critical">Battery critical</string>
+-    <string name="title_preference_auto_update">Auto update</string>
+-    <string name="title_preference_audio_alerts_enabled">Enable Audio Alerts</string>
+-    <string name="title_preference_audio_alert_lowest_gear">Lowest Gear</string>
+-    <string name="title_preference_audio_alert_highest_gear">Highest Gear</string>
+-    <string name="title_preference_audio_alert_shifting_limit">Shifting Limit</string>
+-    <string name="title_preference_audio_alert_upcoming_synchro_shift">Upcoming Synchro Shift</string>
+-    <string name="title_preference_audio_alert_delay">Delay between audio alerts</string>
+-    <string name="title_preference_audio_alert_intensity">Audio Alert Intensity</string>
+-    <string name="title_preference_overlay_enabled">Enable Overlay</string>
+-    <string name="title_preference_overlay_triggers">Triggers</string>
+-    <string name="title_preference_overlay_duration">Duration</string>
+-    <string name="title_preference_overlay_theme">Theme</string>
+-    <string name="title_preference_overlay_opacity">Opacity</string>
+-    <string name="title_preference_overlay_position">Position</string>
+-    <string name="title_preference_switch_turn_screen_on">Turn screen on</string>
+-    <string name="title_preference_accent_color">Accent Color</string>
+-
+-    <string name="summary_preference_ant_recording">Record all ANT events and data into a file for debugging</string>
+-    <string name="summary_preference_battery_notification">Show notifications when the shifting battery level is at or below a certain value</string>
+-    <string name="summary_preference_auto_update">Automatically check for application updates</string>
+-    <string name="summary_preference_audio_alerts_enabled">Enable shifting Audio alerts</string>
+-    <string name="summary_preference_audio_alert_lowest_gear">Audio alert when shifting to the lowest gear</string>
+-    <string name="summary_preference_audio_alert_highest_gear">Audio alert when shifting to the highest gear</string>
+-    <string name="summary_preference_audio_alert_shifting_limit">Audio alert when attempting to shift while already on the gear limit</string>
+-    <string name="summary_preference_audio_alert_upcoming_synchro_shift">Audio alert when the next shift can trigger a synchronized shift (on S2 mode)</string>
+-    <string name="summary_preference_audio_alert_delay">Minimum delay between audio alerts</string>
+-    <string name="summary_preference_audio_alert_intensity">Perceived intensity of the audio alerts</string>
+-    <string name="summary_preference_overlay">Show an Overlay with shifting information in Ride</string>
+-    <string name="summary_preference_graphics">Customize graphical setting of Ki2 elements</string>
+-    <string name="summary_preference_overlay_enabled">Enable Overlay in Ride</string>
+-    <string name="summary_preference_overlay_triggers">Which events cause the overlay to appear</string>
+-    <string name="summary_preference_overlay_duration">Duration that the overlay is visible</string>
+-    <string name="summary_preference_overlay_theme">Visual theme</string>
+-    <string name="summary_preference_overlay_opacity">Overlay view opacity, a low opacity will make the overlay translucent.</string>
+-    <string name="summary_preference_overlay_position">Overlay position in the Ride screen.</string>
+-    <string name="summary_preference_secondary_overlay">Show a secondary Overlay with shifting information in Ride</string>
+-    <string name="summary_preference_switch_turn_screen_on">Turn screen on when a switch is pressed</string>
+-    <string name="summary_preference_accent_color">Accent color used to highlight current gear</string>
+-
+-    <string name="default_preference_switch_ch1_single_press">top_left</string>
+-    <string name="default_preference_switch_ch1_double_press">bottom_left</string>
+-    <string name="default_preference_switch_ch1_hold">map_graph_zoom_out</string>
+-    <string name="default_preference_switch_ch2_single_press">top_right</string>
+-    <string name="default_preference_switch_ch2_double_press">bottom_right</string>
+-    <string name="default_preference_switch_ch2_hold">map_graph_zoom_in</string>
+-    <string name="default_preference_switch">none</string>
+-    <bool name="default_preference_switch_turn_screen_on">true</bool>
+-    <string name="default_preference_battery_level_low">20</string>
+-    <string name="default_preference_battery_level_critical">10</string>
+-    <bool name="default_preference_audio_alerts_enabled">true</bool>
+-    <string name="default_preference_audio_alert_delay">0</string>
+-    <string name="default_preference_audio_alert_intensity">normal</string>
+-    <string name="default_preference_audio_alert_shifting_limit">@string/value_preference_audio_alert_disabled</string>
+-    <string name="default_preference_audio_alert_upcoming_synchro_shift">@string/value_preference_audio_alert_disabled</string>
+-    <bool name="default_preference_auto_update">true</bool>
+-    <bool name="default_preference_ant_recording">false</bool>
+-    <bool name="default_preference_overlay_enabled">false</bool>
+-    <string name="default_preference_overlay_duration">3000</string>
+-    <string name="default_preference_overlay_theme">default_dark_gear_index</string>
+-    <integer name="default_preference_overlay_opacity">1</integer>
+-    <integer name="default_preference_overlay_position">0</integer>
+-    <bool name="default_preference_secondary_overlay_enabled">false</bool>
+-    <string name="default_preference_secondary_overlay_duration">-1</string>
+-    <string name="default_preference_secondary_overlay_theme">slim_dark</string>
+-    <integer name="default_preference_secondary_overlay_opacity">1</integer>
+-    <integer name="default_preference_secondary_overlay_position">0</integer>
+-    <string name="default_preference_accent_color">default</string>
+-
+-    <string name="value_preference_battery_level_off">off</string>
+-    <string name="value_preference_audio_alert_disabled">disabled</string>
+-
+-    <string name="preference_switch_ch1_single_press">SWITCH_CH1_SINGLE_PRESS</string>
+-    <string name="preference_switch_ch1_double_press">SWITCH_CH1_DOUBLE_PRESS</string>
+-    <string name="preference_switch_ch1_hold">SWITCH_CH1_HOLD</string>
+-    <string name="preference_switch_ch2_single_press">SWITCH_CH2_SINGLE_PRESS</string>
+-    <string name="preference_switch_ch2_double_press">SWITCH_CH2_DOUBLE_PRESS</string>
+-    <string name="preference_switch_ch2_hold">SWITCH_CH2_HOLD</string>
+-    <string name="preference_switch_ch3_single_press">SWITCH_CH3_SINGLE_PRESS</string>
+-    <string name="preference_switch_ch3_double_press">SWITCH_CH3_DOUBLE_PRESS</string>
+-    <string name="preference_switch_ch3_hold">SWITCH_CH3_HOLD</string>
+-    <string name="preference_switch_ch4_single_press">SWITCH_CH4_SINGLE_PRESS</string>
+-    <string name="preference_switch_ch4_double_press">SWITCH_CH4_DOUBLE_PRESS</string>
+-    <string name="preference_switch_ch4_hold">SWITCH_CH4_HOLD</string>
+-    <string name="preference_switch_turn_screen_on">SWITCH_TURN_SCREEN_ON</string>
+-    <string name="preference_ant_recording">ANT_RECORDING</string>
+-    <string name="preference_battery_level_low">BATTERY_LEVEL_LOW</string>
+-    <string name="preference_battery_level_critical">BATTERY_LEVEL_CRITICAL</string>
+-    <string name="preference_auto_update">AUTO_UPDATE</string>
+-    <string name="preference_audio_alerts_enabled">AUDIO_ALERTS_ENABLED</string>
+-    <string name="preference_audio_alert_lowest_gear">AUDIO_ALERT_LOWEST_GEAR</string>
+-    <string name="preference_audio_alert_highest_gear">AUDIO_ALERT_HIGHEST_GEAR</string>
+-    <string name="preference_audio_alert_shifting_limit">AUDIO_ALERT_SHIFTING_LIMIT</string>
+-    <string name="preference_audio_alert_upcoming_synchro_shift">AUDIO_ALERT_UPCOMING_SYNCHRO_SHIFT</string>
+-    <string name="preference_audio_alert_delay">AUDIO_ALERT_DELAY</string>
+-    <string name="preference_audio_alert_intensity">AUDIO_ALERT_INTENSITY</string>
+-    <string name="preference_overlay_enabled">OVERLAY_ENABLED</string>
+-    <string name="preference_overlay_triggers">OVERLAY_TRIGGERS</string>
+-    <string name="preference_overlay_duration">OVERLAY_DURATION</string>
+-    <string name="preference_overlay_theme">OVERLAY_THEME</string>
+-    <string name="preference_overlay_opacity">OVERLAY_OPACITY</string>
+-    <string name="preference_overlay_position_x">OVERLAY_POSITION_X</string>
+-    <string name="preference_overlay_position_y">OVERLAY_POSITION_Y</string>
+-    <string name="preference_secondary_overlay_enabled">SECONDARY_OVERLAY_ENABLED</string>
+-    <string name="preference_secondary_overlay_triggers">SECONDARY_OVERLAY_TRIGGERS</string>
+-    <string name="preference_secondary_overlay_duration">SECONDARY_OVERLAY_DURATION</string>
+-    <string name="preference_secondary_overlay_theme">SECONDARY_OVERLAY_THEME</string>
+-    <string name="preference_secondary_overlay_opacity">SECONDARY_OVERLAY_OPACITY</string>
+-    <string name="preference_secondary_overlay_position_x">SECONDARY_OVERLAY_POSITION_X</string>
+-    <string name="preference_secondary_overlay_position_y">SECONDARY_OVERLAY_POSITION_Y</string>
+-    <string name="preference_fit_recording">FIT_RECORDING</string>
+-    <string name="preference_accent_color">ACCENT_COLOR</string>
+-
++<?xml version="1.0" encoding="utf-8"?>
++<resources>
++
++    <string name="category_preference_switches">Switches</string>
++    <string name="category_preference_switch_preferences">Switch preferences</string>
++    <string name="category_preference_switch_ch1">D-Fly Ch. 1</string>
++    <string name="category_preference_switch_ch2">D-Fly Ch. 2</string>
++    <string name="category_preference_switch_ch3">D-Fly Ch. 3</string>
++    <string name="category_preference_switch_ch4">D-Fly Ch. 4</string>
++    <string name="category_preference_ant_recording">ANT Recording</string>
++    <string name="category_preference_battery">Battery</string>
++    <string name="category_preference_battery_notification">Battery Notification</string>
++    <string name="category_preference_update">Update</string>
++    <string name="category_preference_audio_alerts">Audio Alerts</string>
++    <string name="category_preference_audio_alert_settings">Audio Alert Settings</string>
++    <string name="category_preference_general_settings">General Settings</string>
++    <string name="category_preference_overlay">Overlay</string>
++    <string name="category_preference_secondary_overlay">Secondary overlay</string>
++    <string name="category_preference_graphics">Graphics</string>
++
++    <string name="title_preference_switch_single_press">Single Press</string>
++    <string name="title_preference_switch_double_press">Double Press</string>
++    <string name="title_preference_switch_hold">Hold</string>
++    <string name="title_preference_ant_recording">Record ANT communication</string>
++    <string name="title_preference_battery_level_low">Battery low</string>
++    <string name="title_preference_battery_level_critical">Battery critical</string>
++    <string name="title_preference_auto_update">Auto update</string>
++    <string name="title_preference_audio_alerts_enabled">Enable Audio Alerts</string>
++    <string name="title_preference_audio_alert_lowest_gear">Lowest Gear</string>
++    <string name="title_preference_audio_alert_highest_gear">Highest Gear</string>
++    <string name="title_preference_audio_alert_shifting_limit">Shifting Limit</string>
++    <string name="title_preference_audio_alert_upcoming_synchro_shift">Upcoming Synchro Shift</string>
++    <string name="title_preference_audio_alert_delay">Delay between audio alerts</string>
++    <string name="title_preference_audio_alert_intensity">Audio Alert Intensity</string>
++    <string name="title_preference_overlay_enabled">Enable Overlay</string>
++    <string name="title_preference_overlay_triggers">Triggers</string>
++    <string name="title_preference_overlay_duration">Duration</string>
++    <string name="title_preference_overlay_theme">Theme</string>
++    <string name="title_preference_overlay_opacity">Opacity</string>
++    <string name="title_preference_overlay_position">Position</string>
++    <string name="title_preference_switch_turn_screen_on">Turn screen on</string>
++    <string name="title_preference_accent_color">Accent Color</string>
++
++    <string name="summary_preference_ant_recording">Record all ANT events and data into a file for debugging</string>
++    <string name="summary_preference_battery_notification">Show notifications when the shifting battery level is at or below a certain value</string>
++    <string name="summary_preference_auto_update">Automatically check for application updates</string>
++    <string name="summary_preference_audio_alerts_enabled">Enable shifting Audio alerts</string>
++    <string name="summary_preference_audio_alert_lowest_gear">Audio alert when shifting to the lowest gear</string>
++    <string name="summary_preference_audio_alert_highest_gear">Audio alert when shifting to the highest gear</string>
++    <string name="summary_preference_audio_alert_shifting_limit">Audio alert when attempting to shift while already on the gear limit</string>
++    <string name="summary_preference_audio_alert_upcoming_synchro_shift">Audio alert when the next shift can trigger a synchronized shift (on S2 mode)</string>
++    <string name="summary_preference_audio_alert_delay">Minimum delay between audio alerts</string>
++    <string name="summary_preference_audio_alert_intensity">Perceived intensity of the audio alerts</string>
++    <string name="summary_preference_overlay">Show an Overlay with shifting information in Ride</string>
++    <string name="summary_preference_graphics">Customize graphical setting of Ki2 elements</string>
++    <string name="summary_preference_overlay_enabled">Enable Overlay in Ride</string>
++    <string name="summary_preference_overlay_triggers">Which events cause the overlay to appear</string>
++    <string name="summary_preference_overlay_duration">Duration that the overlay is visible</string>
++    <string name="summary_preference_overlay_theme">Visual theme</string>
++    <string name="summary_preference_overlay_opacity">Overlay view opacity, a low opacity will make the overlay translucent.</string>
++    <string name="summary_preference_overlay_position">Overlay position in the Ride screen.</string>
++    <string name="summary_preference_secondary_overlay">Show a secondary Overlay with shifting information in Ride</string>
++    <string name="summary_preference_switch_turn_screen_on">Turn screen on when a switch is pressed</string>
++    <string name="summary_preference_accent_color">Accent color used to highlight current gear</string>
++
++    <string name="default_preference_switch_ch1_single_press">top_left</string>
++    <string name="default_preference_switch_ch1_double_press">bottom_left</string>
++    <string name="default_preference_switch_ch1_hold">map_graph_zoom_out</string>
++    <string name="default_preference_switch_ch2_single_press">top_right</string>
++    <string name="default_preference_switch_ch2_double_press">bottom_right</string>
++    <string name="default_preference_switch_ch2_hold">map_graph_zoom_in</string>
++    <string name="default_preference_switch">none</string>
++    <bool name="default_preference_switch_turn_screen_on">true</bool>
++    <string name="default_preference_battery_level_low">20</string>
++    <string name="default_preference_battery_level_critical">10</string>
++    <bool name="default_preference_audio_alerts_enabled">true</bool>
++    <string name="default_preference_audio_alert_delay">0</string>
++    <string name="default_preference_audio_alert_intensity">normal</string>
++    <string name="default_preference_audio_alert_shifting_limit">@string/value_preference_audio_alert_disabled</string>
++    <string name="default_preference_audio_alert_upcoming_synchro_shift">@string/value_preference_audio_alert_disabled</string>
++    <bool name="default_preference_auto_update">true</bool>
++    <bool name="default_preference_ant_recording">false</bool>
++    <bool name="default_preference_overlay_enabled">false</bool>
++    <string name="default_preference_overlay_duration">3000</string>
++    <string name="default_preference_overlay_theme">default_dark_gear_index</string>
++    <integer name="default_preference_overlay_opacity">1</integer>
++    <integer name="default_preference_overlay_position">0</integer>
++    <bool name="default_preference_secondary_overlay_enabled">false</bool>
++    <string name="default_preference_secondary_overlay_duration">-1</string>
++    <string name="default_preference_secondary_overlay_theme">slim_dark</string>
++    <integer name="default_preference_secondary_overlay_opacity">1</integer>
++    <integer name="default_preference_secondary_overlay_position">0</integer>
++    <string name="default_preference_accent_color">default</string>
++
++    <string name="value_preference_battery_level_off">off</string>
++    <string name="value_preference_audio_alert_disabled">disabled</string>
++
++    <string name="preference_switch_ch1_single_press">SWITCH_CH1_SINGLE_PRESS</string>
++    <string name="preference_switch_ch1_double_press">SWITCH_CH1_DOUBLE_PRESS</string>
++    <string name="preference_switch_ch1_hold">SWITCH_CH1_HOLD</string>
++    <string name="preference_switch_ch2_single_press">SWITCH_CH2_SINGLE_PRESS</string>
++    <string name="preference_switch_ch2_double_press">SWITCH_CH2_DOUBLE_PRESS</string>
++    <string name="preference_switch_ch2_hold">SWITCH_CH2_HOLD</string>
++    <string name="preference_switch_ch3_single_press">SWITCH_CH3_SINGLE_PRESS</string>
++    <string name="preference_switch_ch3_double_press">SWITCH_CH3_DOUBLE_PRESS</string>
++    <string name="preference_switch_ch3_hold">SWITCH_CH3_HOLD</string>
++    <string name="preference_switch_ch4_single_press">SWITCH_CH4_SINGLE_PRESS</string>
++    <string name="preference_switch_ch4_double_press">SWITCH_CH4_DOUBLE_PRESS</string>
++    <string name="preference_switch_ch4_hold">SWITCH_CH4_HOLD</string>
++    <string name="preference_switch_turn_screen_on">SWITCH_TURN_SCREEN_ON</string>
++    <string name="preference_ant_recording">ANT_RECORDING</string>
++    <string name="preference_battery_level_low">BATTERY_LEVEL_LOW</string>
++    <string name="preference_battery_level_critical">BATTERY_LEVEL_CRITICAL</string>
++    <string name="preference_auto_update">AUTO_UPDATE</string>
++    <string name="preference_audio_alerts_enabled">AUDIO_ALERTS_ENABLED</string>
++    <string name="preference_audio_alert_lowest_gear">AUDIO_ALERT_LOWEST_GEAR</string>
++    <string name="preference_audio_alert_highest_gear">AUDIO_ALERT_HIGHEST_GEAR</string>
++    <string name="preference_audio_alert_shifting_limit">AUDIO_ALERT_SHIFTING_LIMIT</string>
++    <string name="preference_audio_alert_upcoming_synchro_shift">AUDIO_ALERT_UPCOMING_SYNCHRO_SHIFT</string>
++    <string name="preference_audio_alert_delay">AUDIO_ALERT_DELAY</string>
++    <string name="preference_audio_alert_intensity">AUDIO_ALERT_INTENSITY</string>
++    <string name="preference_overlay_enabled">OVERLAY_ENABLED</string>
++    <string name="preference_overlay_triggers">OVERLAY_TRIGGERS</string>
++    <string name="preference_overlay_duration">OVERLAY_DURATION</string>
++    <string name="preference_overlay_theme">OVERLAY_THEME</string>
++    <string name="preference_overlay_opacity">OVERLAY_OPACITY</string>
++    <string name="preference_overlay_position_x">OVERLAY_POSITION_X</string>
++    <string name="preference_overlay_position_y">OVERLAY_POSITION_Y</string>
++    <string name="preference_secondary_overlay_enabled">SECONDARY_OVERLAY_ENABLED</string>
++    <string name="preference_secondary_overlay_triggers">SECONDARY_OVERLAY_TRIGGERS</string>
++    <string name="preference_secondary_overlay_duration">SECONDARY_OVERLAY_DURATION</string>
++    <string name="preference_secondary_overlay_theme">SECONDARY_OVERLAY_THEME</string>
++    <string name="preference_secondary_overlay_opacity">SECONDARY_OVERLAY_OPACITY</string>
++    <string name="preference_secondary_overlay_position_x">SECONDARY_OVERLAY_POSITION_X</string>
++    <string name="preference_secondary_overlay_position_y">SECONDARY_OVERLAY_POSITION_Y</string>
++    <string name="preference_fit_recording">FIT_RECORDING</string>
++    <string name="preference_accent_color">ACCENT_COLOR</string>
++
++    <!-- Ride metrics (gear inches, speed at cadence, shift advice) -->
++    <string name="category_preference_ride_metrics">Ride Metrics</string>
++    <string name="title_preference_wheel_circumference">Wheel circumference (mm)</string>
++    <string name="summary_preference_wheel_circumference">Used for gear inches and speed at cadence. 700x25c = 2096, 700x28c = 2136.</string>
++    <string name="preference_wheel_circumference">WHEEL_CIRCUMFERENCE_MM</string>
++    <string name="default_preference_wheel_circumference">2096</string>
++    <string name="title_preference_target_cadence">Target cadence (rpm)</string>
++    <string name="summary_preference_target_cadence">Used by Shift Advice to recommend gear changes.</string>
++    <string name="preference_target_cadence">TARGET_CADENCE</string>
++    <string name="default_preference_target_cadence">90</string>
++
++    <!-- Aero, pacing and fuel (Ki2 Pro) -->
++    <string name="category_preference_aero_fuel">Aero, Pacing &amp; Fuel</string>
++    <string name="title_preference_total_mass">Total mass (kg)</string>
++    <string name="summary_preference_total_mass">Rider + bike + kit. Used by Aero Score, Wind and Split Predictor.</string>
++    <string name="preference_total_mass">TOTAL_MASS_KG</string>
++    <string name="default_preference_total_mass">95</string>
++    <string name="title_preference_crr">Rolling resistance (Crr)</string>
++    <string name="summary_preference_crr">Good road tires on asphalt: 0.004-0.005.</string>
++    <string name="preference_crr">CRR</string>
++    <string name="default_preference_crr">0.0045</string>
++    <string name="title_preference_drivetrain_efficiency">Drivetrain efficiency</string>
++    <string name="summary_preference_drivetrain_efficiency">Waxed chain: 0.975-0.98.</string>
++    <string name="preference_drivetrain_efficiency">DRIVETRAIN_EFFICIENCY</string>
++    <string name="default_preference_drivetrain_efficiency">0.975</string>
++    <string name="title_preference_air_density">Air density (kg/m³)</string>
++    <string name="summary_preference_air_density">Sea level: 1.25 at 10°C, 1.225 at 15°C, 1.18 at 25°C.</string>
++    <string name="preference_air_density">AIR_DENSITY</string>
++    <string name="default_preference_air_density">1.225</string>
++    <string name="title_preference_calibrated_cda">Calibrated CdA (m²)</string>
++    <string name="summary_preference_calibrated_cda">Your measured CdA from Aero Score testing. Used by Wind and Split Predictor.</string>
++    <string name="preference_calibrated_cda">CALIBRATED_CDA</string>
++    <string name="default_preference_calibrated_cda">0.300</string>
++    <string name="title_preference_race_distance">Race distance (km)</string>
++    <string name="summary_preference_race_distance">Distance used by the Split Predictor.</string>
++    <string name="preference_race_distance">RACE_DISTANCE_KM</string>
++    <string name="default_preference_race_distance">180</string>
++    <string name="title_preference_target_split">Target split (minutes)</string>
++    <string name="summary_preference_target_split">Split Predictor turns green at or under this time.</string>
++    <string name="preference_target_split">TARGET_SPLIT_MIN</string>
++    <string name="default_preference_target_split">270</string>
++    <string name="title_preference_carbs_per_hour">Carb target (g/h)</string>
++    <string name="summary_preference_carbs_per_hour">Fuel Coach intake target.</string>
++    <string name="preference_carbs_per_hour">CARBS_PER_HOUR</string>
++    <string name="default_preference_carbs_per_hour">90</string>
++    <string name="title_preference_carbs_portion">Carb portion (g)</string>
++    <string name="summary_preference_carbs_portion">Grams per gel/bar logged with the Di2 button.</string>
++    <string name="preference_carbs_portion">CARBS_PORTION</string>
++    <string name="default_preference_carbs_portion">25</string>
++
+ </resources>
+\ No newline at end of file
+diff --git a/app/src/main/res/xml/karoo_extension_info.xml b/app/src/main/res/xml/karoo_extension_info.xml
+index 7518e85..a3cf044 100644
+--- a/app/src/main/res/xml/karoo_extension_info.xml
++++ b/app/src/main/res/xml/karoo_extension_info.xml
+@@ -130,4 +130,67 @@
+         icon="@drawable/ic_hh_battery"
+         typeId="DATATYPE_VISUAL_BIKE_BATTERY" />
+ 
++    <DataType
++        description="Gear inches of the current gear (wheel circumference configurable in Ki2 settings)."
++        displayName="Gear Inches"
++        graphical="true"
++        icon="@drawable/ic_hh_gear"
++        typeId="DATATYPE_GEAR_INCHES" />
++
++    <DataType
++        description="Speed in km/h at target cadence in the current gear."
++        displayName="Speed @ Cadence"
++        graphical="true"
++        icon="@drawable/ic_hh_gear"
++        typeId="DATATYPE_SPEED_AT_CADENCE" />
++
++    <DataType
++        description="Rear shift recommendation to hit target cadence at current speed."
++        displayName="Shift Advice"
++        graphical="true"
++        icon="@drawable/ic_hh_gear"
++        typeId="DATATYPE_SHIFT_ADVICE" />
++
++    <DataType
++        description="All-in-one: large gear display with teeth, development, Di2 battery, cross-chain warning and live shift advice."
++        displayName="Gears Pro (visual)"
++        graphical="true"
++        icon="@drawable/ic_hh_gear"
++        typeId="DATATYPE_VISUAL_GEARS_PRO" />
++
++    <DataType
++        description="Live CdA (m²) of the current aero test segment. Map a Di2 button to Aero: New Segment for A/B position testing."
++        displayName="Aero Score"
++        graphical="true"
++        icon="@drawable/ic_hh_gear"
++        typeId="DATATYPE_AERO_SCORE" />
++
++    <DataType
++        description="Apparent wind in m/s from the calibrated CdA. + headwind, − tailwind/drafting."
++        displayName="Wind"
++        graphical="true"
++        icon="@drawable/ic_hh_gear"
++        typeId="DATATYPE_WIND_GAUGE" />
++
++    <DataType
++        description="Carb balance vs your g/h target. Map a Di2 button to Fuel: Log Intake."
++        displayName="Fuel Balance"
++        graphical="true"
++        icon="@drawable/ic_hh_gear"
++        typeId="DATATYPE_FUEL_STATE" />
++
++    <DataType
++        description="Countdown to the next carb portion. Shows EAT when due."
++        displayName="Fuel Timer"
++        graphical="true"
++        icon="@drawable/ic_hh_gear"
++        typeId="DATATYPE_FUEL_TIMER" />
++
++    <DataType
++        description="Projected bike split for your race distance at current Normalized Power and calibrated CdA."
++        displayName="Split Predictor"
++        graphical="true"
++        icon="@drawable/ic_hh_gear"
++        typeId="DATATYPE_SPLIT_PREDICTOR" />
++
+ </ExtensionInfo>
+\ No newline at end of file
+diff --git a/app/src/main/res/xml/preferences_general.xml b/app/src/main/res/xml/preferences_general.xml
+index dc5e959..8f95279 100644
+--- a/app/src/main/res/xml/preferences_general.xml
++++ b/app/src/main/res/xml/preferences_general.xml
+@@ -11,4 +11,89 @@
+ 
+     </PreferenceCategory>
+ 
++    <PreferenceCategory app:title="@string/category_preference_ride_metrics">
++
++        <EditTextPreference
++            app:defaultValue="@string/default_preference_wheel_circumference"
++            app:key="@string/preference_wheel_circumference"
++            app:summary="@string/summary_preference_wheel_circumference"
++            app:title="@string/title_preference_wheel_circumference"
++            app:useSimpleSummaryProvider="false" />
++
++        <EditTextPreference
++            app:defaultValue="@string/default_preference_target_cadence"
++            app:key="@string/preference_target_cadence"
++            app:summary="@string/summary_preference_target_cadence"
++            app:title="@string/title_preference_target_cadence"
++            app:useSimpleSummaryProvider="false" />
++
++    </PreferenceCategory>
++
++    <PreferenceCategory app:title="@string/category_preference_aero_fuel">
++
++        <EditTextPreference
++            app:defaultValue="@string/default_preference_total_mass"
++            app:key="@string/preference_total_mass"
++            app:summary="@string/summary_preference_total_mass"
++            app:title="@string/title_preference_total_mass"
++            app:useSimpleSummaryProvider="false" />
++
++        <EditTextPreference
++            app:defaultValue="@string/default_preference_crr"
++            app:key="@string/preference_crr"
++            app:summary="@string/summary_preference_crr"
++            app:title="@string/title_preference_crr"
++            app:useSimpleSummaryProvider="false" />
++
++        <EditTextPreference
++            app:defaultValue="@string/default_preference_drivetrain_efficiency"
++            app:key="@string/preference_drivetrain_efficiency"
++            app:summary="@string/summary_preference_drivetrain_efficiency"
++            app:title="@string/title_preference_drivetrain_efficiency"
++            app:useSimpleSummaryProvider="false" />
++
++        <EditTextPreference
++            app:defaultValue="@string/default_preference_air_density"
++            app:key="@string/preference_air_density"
++            app:summary="@string/summary_preference_air_density"
++            app:title="@string/title_preference_air_density"
++            app:useSimpleSummaryProvider="false" />
++
++        <EditTextPreference
++            app:defaultValue="@string/default_preference_calibrated_cda"
++            app:key="@string/preference_calibrated_cda"
++            app:summary="@string/summary_preference_calibrated_cda"
++            app:title="@string/title_preference_calibrated_cda"
++            app:useSimpleSummaryProvider="false" />
++
++        <EditTextPreference
++            app:defaultValue="@string/default_preference_race_distance"
++            app:key="@string/preference_race_distance"
++            app:summary="@string/summary_preference_race_distance"
++            app:title="@string/title_preference_race_distance"
++            app:useSimpleSummaryProvider="false" />
++
++        <EditTextPreference
++            app:defaultValue="@string/default_preference_target_split"
++            app:key="@string/preference_target_split"
++            app:summary="@string/summary_preference_target_split"
++            app:title="@string/title_preference_target_split"
++            app:useSimpleSummaryProvider="false" />
++
++        <EditTextPreference
++            app:defaultValue="@string/default_preference_carbs_per_hour"
++            app:key="@string/preference_carbs_per_hour"
++            app:summary="@string/summary_preference_carbs_per_hour"
++            app:title="@string/title_preference_carbs_per_hour"
++            app:useSimpleSummaryProvider="false" />
++
++        <EditTextPreference
++            app:defaultValue="@string/default_preference_carbs_portion"
++            app:key="@string/preference_carbs_portion"
++            app:summary="@string/summary_preference_carbs_portion"
++            app:title="@string/title_preference_carbs_portion"
++            app:useSimpleSummaryProvider="false" />
++
++    </PreferenceCategory>
++
+ </PreferenceScreen>
+\ No newline at end of file
