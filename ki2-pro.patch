@@ -3609,3 +3609,32 @@ index daac447..ebacd72 100644
                      jsonObject.get(KEY_DESCRIPTION).getAsString(),
                      Instant.parse(jsonObject.get(KEY_PUBLISHED_DATE).getAsString()),
                      jsonObject.get(KEY_URL).getAsString(),
+diff --git a/app/manifest-template.json b/app/manifest-template.json
+index 1b0113b..fe24be5 100644
+--- a/app/manifest-template.json
++++ b/app/manifest-template.json
+@@ -1,8 +1,8 @@
+ {
+-  "label": "Ki2",
+-  "packageName": "com.valterc.ki2",
++  "label": "Ki2 Pro",
++  "packageName": "com.valterc.ki2.pro",
+   "iconUrl": "https://github.com/valterc/ki2/releases/latest/download/icon.png",
+-  "latestApkUrl": "https://github.com/valterc/ki2/releases/latest/download/ki2-release.apk",
++  "latestApkUrl": "https://github.com/lliedecke/ki2-pro-v2/releases/latest/download/ki2-pro.apk",
+   "latestVersion": "__VERSION_NAME__",
+   "latestVersionCode": __VERSION_CODE__,
+   "developer": "Valter C.",
+diff --git a/app/src/main/AndroidManifest.xml b/app/src/main/AndroidManifest.xml
+index c7fa968..0d4b9a6 100644
+--- a/app/src/main/AndroidManifest.xml
++++ b/app/src/main/AndroidManifest.xml
+@@ -75,7 +75,7 @@
+ 
+         <meta-data
+             android:name="io.hammerhead.karooext.MANIFEST_URL"
+-            android:value="https://github.com/valterc/ki2/releases/latest/download/manifest.json" />
++            android:value="https://github.com/lliedecke/ki2-pro-v2/releases/latest/download/manifest.json" />
+ 
+         <receiver android:name="com.valterc.ki2.receivers.ChangeShiftModeReceiver" />
+     </application>
