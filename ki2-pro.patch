@@ -1039,10 +1039,10 @@ index 146985f..d86fd0a 100644
              BikeBatteryVisualDataType(extensionContext),
 diff --git a/app/src/main/java/com/valterc/ki2/karoo/datatypes/text/AeroScoreDataType.kt b/app/src/main/java/com/valterc/ki2/karoo/datatypes/text/AeroScoreDataType.kt
 new file mode 100644
-index 0000000..b7f9cf9
+index 0000000..5b9778d
 --- /dev/null
 +++ b/app/src/main/java/com/valterc/ki2/karoo/datatypes/text/AeroScoreDataType.kt
-@@ -0,0 +1,88 @@
+@@ -0,0 +1,96 @@
 +package com.valterc.ki2.karoo.datatypes.text
 +
 +import android.content.Context
@@ -1053,6 +1053,7 @@ index 0000000..b7f9cf9
 +import com.valterc.ki2.karoo.Ki2ExtensionContext
 +import com.valterc.ki2.karoo.datatypes.views.TextFit
 +import com.valterc.ki2.karoo.datatypes.views.TextView
++import com.valterc.ki2.karoo.datatypes.views.Waiting
 +import io.hammerhead.karooext.extension.DataTypeImpl
 +import io.hammerhead.karooext.internal.ViewEmitter
 +import io.hammerhead.karooext.models.ShowCustomStreamState
@@ -1095,26 +1096,33 @@ index 0000000..b7f9cf9
 +    private suspend fun emitViewUpdate(context: Context, config: ViewConfig, emitter: ViewEmitter) {
 +        val engine = extensionContext.aeroEngine
 +        val cda = engine.currentCda()
-+        val previous = engine.previousSegmentCda()
 +
++        // No estimate yet (no power meter, or not enough clean samples this
++        // segment): match the same waiting indicator every native Karoo/Ki2
++        // field shows while it has nothing to show, instead of a hard-to-spot
++        // placeholder character.
++        if (cda == null) {
++            lastRendered = null
++            val waiting = glance.compose(context, DpSize.Unspecified) {
++                Waiting(dataAlignment = config.alignment)
++            }
++            emitter.updateView(waiting.remoteViews)
++            return
++        }
++
++        val previous = engine.previousSegmentCda()
 +        var color: Color? = null
-+        val text = when {
-+            cda == null && engine.sampleCount() == 0 -> "—"
-+            cda == null -> "…"
-+            else -> {
-+                var suffix = ""
-+                if (previous != null && engine.sampleCount() >= 40 && abs(cda - previous) > 0.003) {
-+                    if (cda < previous) {
-+                        suffix = "▼"
-+                        color = COLOR_GREEN
-+                    } else {
-+                        suffix = "▲"
-+                        color = COLOR_RED
-+                    }
-+                }
-+                String.format(Locale.US, "%.3f%s", cda, suffix)
++        var suffix = ""
++        if (previous != null && engine.sampleCount() >= 40 && abs(cda - previous) > 0.003) {
++            if (cda < previous) {
++                suffix = "▼"
++                color = COLOR_GREEN
++            } else {
++                suffix = "▲"
++                color = COLOR_RED
 +            }
 +        }
++        val text = String.format(Locale.US, "%.3f%s", cda, suffix)
 +
 +        val rendered = text to color
 +        if (rendered == lastRendered) return
@@ -1133,10 +1141,10 @@ index 0000000..b7f9cf9
 +}
 diff --git a/app/src/main/java/com/valterc/ki2/karoo/datatypes/text/FuelStateDataType.kt b/app/src/main/java/com/valterc/ki2/karoo/datatypes/text/FuelStateDataType.kt
 new file mode 100644
-index 0000000..6056917
+index 0000000..e4ae639
 --- /dev/null
 +++ b/app/src/main/java/com/valterc/ki2/karoo/datatypes/text/FuelStateDataType.kt
-@@ -0,0 +1,81 @@
+@@ -0,0 +1,86 @@
 +package com.valterc.ki2.karoo.datatypes.text
 +
 +import android.content.Context
@@ -1147,6 +1155,7 @@ index 0000000..6056917
 +import com.valterc.ki2.karoo.Ki2ExtensionContext
 +import com.valterc.ki2.karoo.datatypes.views.TextFit
 +import com.valterc.ki2.karoo.datatypes.views.TextView
++import com.valterc.ki2.karoo.datatypes.views.Waiting
 +import io.hammerhead.karooext.extension.DataTypeImpl
 +import io.hammerhead.karooext.internal.ViewEmitter
 +import io.hammerhead.karooext.models.ShowCustomStreamState
@@ -1188,19 +1197,23 @@ index 0000000..6056917
 +    private suspend fun emitViewUpdate(context: Context, config: ViewConfig, emitter: ViewEmitter) {
 +        val engine = extensionContext.fuelEngine
 +
-+        var color: Color? = null
-+        val text = if (!engine.active()) {
-+            "—"
-+        } else {
-+            val balance = engine.balanceGrams()
-+            color = when {
-+                balance <= -engine.portionGrams() -> COLOR_RED
-+                balance >= 0 -> COLOR_GREEN
-+                else -> COLOR_AMBER
++        if (!engine.active()) {
++            lastRendered = null
++            val waiting = glance.compose(context, DpSize.Unspecified) {
++                Waiting(dataAlignment = config.alignment)
 +            }
-+            val grams = balance.roundToInt()
-+            if (grams > 0) "+${grams}g" else "${grams}g"
++            emitter.updateView(waiting.remoteViews)
++            return
 +        }
++
++        val balance = engine.balanceGrams()
++        val color = when {
++            balance <= -engine.portionGrams() -> COLOR_RED
++            balance >= 0 -> COLOR_GREEN
++            else -> COLOR_AMBER
++        }
++        val grams = balance.roundToInt()
++        val text = if (grams > 0) "+${grams}g" else "${grams}g"
 +
 +        val rendered = text to color
 +        if (rendered == lastRendered) return
@@ -1220,10 +1233,10 @@ index 0000000..6056917
 +}
 diff --git a/app/src/main/java/com/valterc/ki2/karoo/datatypes/text/FuelTimerDataType.kt b/app/src/main/java/com/valterc/ki2/karoo/datatypes/text/FuelTimerDataType.kt
 new file mode 100644
-index 0000000..85dfed7
+index 0000000..c139de6
 --- /dev/null
 +++ b/app/src/main/java/com/valterc/ki2/karoo/datatypes/text/FuelTimerDataType.kt
-@@ -0,0 +1,81 @@
+@@ -0,0 +1,87 @@
 +package com.valterc.ki2.karoo.datatypes.text
 +
 +import android.content.Context
@@ -1234,6 +1247,7 @@ index 0000000..85dfed7
 +import com.valterc.ki2.karoo.Ki2ExtensionContext
 +import com.valterc.ki2.karoo.datatypes.views.TextFit
 +import com.valterc.ki2.karoo.datatypes.views.TextView
++import com.valterc.ki2.karoo.datatypes.views.Waiting
 +import io.hammerhead.karooext.extension.DataTypeImpl
 +import io.hammerhead.karooext.internal.ViewEmitter
 +import io.hammerhead.karooext.models.ShowCustomStreamState
@@ -1274,20 +1288,25 @@ index 0000000..85dfed7
 +    private suspend fun emitViewUpdate(context: Context, config: ViewConfig, emitter: ViewEmitter) {
 +        val engine = extensionContext.fuelEngine
 +
-+        var color: Color? = null
-+        val text = if (!engine.active()) {
-+            "—"
-+        } else {
-+            val seconds = engine.secondsToNextIntake()
-+            if (seconds <= 0) {
-+                color = COLOR_RED
-+                "EAT"
-+            } else {
-+                if (seconds < 60) color = COLOR_AMBER
-+                val minutes = (seconds / 60).toInt()
-+                val secs = (seconds % 60).toInt()
-+                String.format(Locale.US, "%d:%02d", minutes, secs)
++        if (!engine.active()) {
++            lastRendered = null
++            val waiting = glance.compose(context, DpSize.Unspecified) {
++                Waiting(dataAlignment = config.alignment)
 +            }
++            emitter.updateView(waiting.remoteViews)
++            return
++        }
++
++        var color: Color? = null
++        val seconds = engine.secondsToNextIntake()
++        val text = if (seconds <= 0) {
++            color = COLOR_RED
++            "EAT"
++        } else {
++            if (seconds < 60) color = COLOR_AMBER
++            val minutes = (seconds / 60).toInt()
++            val secs = (seconds % 60).toInt()
++            String.format(Locale.US, "%d:%02d", minutes, secs)
 +        }
 +
 +        val rendered = text to color
@@ -1439,10 +1458,10 @@ index 0000000..1633e5c
 +}
 diff --git a/app/src/main/java/com/valterc/ki2/karoo/datatypes/text/ShiftAdviceDataType.kt b/app/src/main/java/com/valterc/ki2/karoo/datatypes/text/ShiftAdviceDataType.kt
 new file mode 100644
-index 0000000..52e77e7
+index 0000000..a0eb84f
 --- /dev/null
 +++ b/app/src/main/java/com/valterc/ki2/karoo/datatypes/text/ShiftAdviceDataType.kt
-@@ -0,0 +1,187 @@
+@@ -0,0 +1,204 @@
 +package com.valterc.ki2.karoo.datatypes.text
 +
 +import android.content.Context
@@ -1487,7 +1506,9 @@ index 0000000..52e77e7
 + *  - "▼1": shift 1 gear easier (bigger cog)
 + *  - "✓": cadence within the target band
 + *  - "F▲"/"F▼": rear cassette exhausted, change chainring
-+ *  - "–": no valid cadence (coasting or no sensor)
++ *  - "–": gearing already exhausted in the needed direction, nothing to do
++ *  - "...": coasting or no cadence signal yet, same as any other Karoo field
++ *           still waiting on its first reading
 + */
 +@OptIn(ExperimentalGlanceRemoteViewsApi::class)
 +class ShiftAdviceDataType(private val extensionContext: Ki2ExtensionContext) :
@@ -1569,17 +1590,27 @@ index 0000000..52e77e7
 +                    targetCadence
 +                )
 +
-+                val (text, color) = adviceDisplay(advice, targetCadence)
-+                if (text to color == lastRendered) return
-+                lastRendered = text to color
-+
-+                glance.compose(context, DpSize.Unspecified) {
-+                    TextView(
-+                        text,
-+                        dataAlignment = config.alignment,
-+                        fontSize = TextFit.fitFontSizeSp(context, text, config),
-+                        textColor = color
-+                    )
++                val displayPair = adviceDisplay(advice, targetCadence)
++                if (displayPair == null) {
++                    // Coasting or no cadence signal: nothing to advise yet, same
++                    // "waiting for data" state as any other field on first load.
++                    if (lastRendered == null) return
++                    lastRendered = null
++                    glance.compose(context, DpSize.Unspecified) {
++                        Waiting(dataAlignment = config.alignment)
++                    }
++                } else {
++                    val (text, color) = displayPair
++                    if (text to color == lastRendered) return
++                    lastRendered = text to color
++                    glance.compose(context, DpSize.Unspecified) {
++                        TextView(
++                            text,
++                            dataAlignment = config.alignment,
++                            fontSize = TextFit.fitFontSizeSp(context, text, config),
++                            textColor = color
++                        )
++                    }
 +                }
 +            } else if (connectionInfo?.isClosed == true) {
 +                lastRendered = null
@@ -1596,12 +1627,17 @@ index 0000000..52e77e7
 +        emitter.updateView(compositionResult.remoteViews)
 +    }
 +
++    /**
++     * Returns the text/color to render, or null when there is currently no
++     * advice to show (coasting / cadence below the valid threshold) — the
++     * caller renders the shared waiting placeholder for that case.
++     */
 +    private fun adviceDisplay(
 +        advice: GearMetrics.ShiftAdvice?,
 +        targetCadence: Int
-+    ): Pair<String, Color?> {
++    ): Pair<String, Color?>? {
 +        if (advice == null) {
-+            return "–" to null
++            return null
 +        }
 +
 +        if (advice.suggestFrontShift) {
@@ -1772,10 +1808,10 @@ index 0000000..0c6a6ac
 +}
 diff --git a/app/src/main/java/com/valterc/ki2/karoo/datatypes/text/SplitPredictorDataType.kt b/app/src/main/java/com/valterc/ki2/karoo/datatypes/text/SplitPredictorDataType.kt
 new file mode 100644
-index 0000000..9532077
+index 0000000..f12a9cc
 --- /dev/null
 +++ b/app/src/main/java/com/valterc/ki2/karoo/datatypes/text/SplitPredictorDataType.kt
-@@ -0,0 +1,122 @@
+@@ -0,0 +1,131 @@
 +package com.valterc.ki2.karoo.datatypes.text
 +
 +import android.content.Context
@@ -1872,15 +1908,24 @@ index 0000000..9532077
 +            val distanceMeters = preferences.getRaceDistanceKm(context) * 1000.0
 +            val targetSeconds = preferences.getTargetSplitMinutes(context) * 60.0
 +
-+            val (text, color) = if (speed < 1.0) {
-+                "…" to null
-+            } else {
-+                val seconds = distanceMeters / speed
-+                val hours = (seconds / 3600).toInt()
-+                val minutes = ((seconds % 3600) / 60).toInt()
-+                val formatted = String.format(Locale.US, "%d:%02d", hours, minutes)
-+                formatted to if (seconds <= targetSeconds) COLOR_GREEN else COLOR_RED
++            if (speed < 1.0) {
++                // Solver couldn't converge to a sane speed: same waiting state
++                // as before normalized power arrived, rather than a stray dot.
++                if (lastRendered == null) return
++                lastRendered = null
++                val waiting = glance.compose(context, DpSize.Unspecified) {
++                    Waiting(dataAlignment = config.alignment)
++                }
++                emitter.updateView(waiting.remoteViews)
++                return
 +            }
++
++            val seconds = distanceMeters / speed
++            val hours = (seconds / 3600).toInt()
++            val minutes = ((seconds % 3600) / 60).toInt()
++            val formatted = String.format(Locale.US, "%d:%02d", hours, minutes)
++            val text = formatted
++            val color = if (seconds <= targetSeconds) COLOR_GREEN else COLOR_RED
 +
 +            val rendered = text to color
 +            if (rendered == lastRendered) return
@@ -1900,10 +1945,10 @@ index 0000000..9532077
 +}
 diff --git a/app/src/main/java/com/valterc/ki2/karoo/datatypes/text/WindGaugeDataType.kt b/app/src/main/java/com/valterc/ki2/karoo/datatypes/text/WindGaugeDataType.kt
 new file mode 100644
-index 0000000..a71c42e
+index 0000000..4f07b62
 --- /dev/null
 +++ b/app/src/main/java/com/valterc/ki2/karoo/datatypes/text/WindGaugeDataType.kt
-@@ -0,0 +1,75 @@
+@@ -0,0 +1,84 @@
 +package com.valterc.ki2.karoo.datatypes.text
 +
 +import android.content.Context
@@ -1914,6 +1959,7 @@ index 0000000..a71c42e
 +import com.valterc.ki2.karoo.Ki2ExtensionContext
 +import com.valterc.ki2.karoo.datatypes.views.TextFit
 +import com.valterc.ki2.karoo.datatypes.views.TextView
++import com.valterc.ki2.karoo.datatypes.views.Waiting
 +import io.hammerhead.karooext.extension.DataTypeImpl
 +import io.hammerhead.karooext.internal.ViewEmitter
 +import io.hammerhead.karooext.models.ShowCustomStreamState
@@ -1956,13 +2002,21 @@ index 0000000..a71c42e
 +    private suspend fun emitViewUpdate(context: Context, config: ViewConfig, emitter: ViewEmitter) {
 +        val wind = extensionContext.aeroEngine.currentWind()
 +
++        if (wind == null) {
++            lastRendered = null
++            val waiting = glance.compose(context, DpSize.Unspecified) {
++                Waiting(dataAlignment = config.alignment)
++            }
++            emitter.updateView(waiting.remoteViews)
++            return
++        }
++
 +        val color = when {
-+            wind == null -> null
 +            wind >= 2.0 -> COLOR_RED
 +            wind <= -2.0 -> COLOR_GREEN
 +            else -> null
 +        }
-+        val text = if (wind == null) "…" else String.format(Locale.US, "%+.1f", wind)
++        val text = String.format(Locale.US, "%+.1f", wind)
 +
 +        val rendered = text to color
 +        if (rendered == lastRendered) return
