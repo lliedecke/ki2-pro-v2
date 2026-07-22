@@ -1039,10 +1039,10 @@ index 146985f..d86fd0a 100644
              BikeBatteryVisualDataType(extensionContext),
 diff --git a/app/src/main/java/com/valterc/ki2/karoo/datatypes/text/AeroScoreDataType.kt b/app/src/main/java/com/valterc/ki2/karoo/datatypes/text/AeroScoreDataType.kt
 new file mode 100644
-index 0000000..c8fa77f
+index 0000000..b7f9cf9
 --- /dev/null
 +++ b/app/src/main/java/com/valterc/ki2/karoo/datatypes/text/AeroScoreDataType.kt
-@@ -0,0 +1,87 @@
+@@ -0,0 +1,88 @@
 +package com.valterc.ki2.karoo.datatypes.text
 +
 +import android.content.Context
@@ -1051,6 +1051,7 @@ index 0000000..c8fa77f
 +import androidx.glance.appwidget.ExperimentalGlanceRemoteViewsApi
 +import androidx.glance.appwidget.GlanceRemoteViews
 +import com.valterc.ki2.karoo.Ki2ExtensionContext
++import com.valterc.ki2.karoo.datatypes.views.TextFit
 +import com.valterc.ki2.karoo.datatypes.views.TextView
 +import io.hammerhead.karooext.extension.DataTypeImpl
 +import io.hammerhead.karooext.internal.ViewEmitter
@@ -1120,7 +1121,7 @@ index 0000000..c8fa77f
 +        lastRendered = rendered
 +
 +        val compositionResult = glance.compose(context, DpSize.Unspecified) {
-+            TextView(text, dataAlignment = config.alignment, fontSize = config.textSize, textColor = color)
++            TextView(text, dataAlignment = config.alignment, fontSize = TextFit.fitFontSizeSp(context, text, config), textColor = color)
 +        }
 +        emitter.updateView(compositionResult.remoteViews)
 +    }
@@ -1132,10 +1133,10 @@ index 0000000..c8fa77f
 +}
 diff --git a/app/src/main/java/com/valterc/ki2/karoo/datatypes/text/FuelStateDataType.kt b/app/src/main/java/com/valterc/ki2/karoo/datatypes/text/FuelStateDataType.kt
 new file mode 100644
-index 0000000..6027df2
+index 0000000..6056917
 --- /dev/null
 +++ b/app/src/main/java/com/valterc/ki2/karoo/datatypes/text/FuelStateDataType.kt
-@@ -0,0 +1,80 @@
+@@ -0,0 +1,81 @@
 +package com.valterc.ki2.karoo.datatypes.text
 +
 +import android.content.Context
@@ -1144,6 +1145,7 @@ index 0000000..6027df2
 +import androidx.glance.appwidget.ExperimentalGlanceRemoteViewsApi
 +import androidx.glance.appwidget.GlanceRemoteViews
 +import com.valterc.ki2.karoo.Ki2ExtensionContext
++import com.valterc.ki2.karoo.datatypes.views.TextFit
 +import com.valterc.ki2.karoo.datatypes.views.TextView
 +import io.hammerhead.karooext.extension.DataTypeImpl
 +import io.hammerhead.karooext.internal.ViewEmitter
@@ -1205,7 +1207,7 @@ index 0000000..6027df2
 +        lastRendered = rendered
 +
 +        val compositionResult = glance.compose(context, DpSize.Unspecified) {
-+            TextView(text, dataAlignment = config.alignment, fontSize = config.textSize, textColor = color)
++            TextView(text, dataAlignment = config.alignment, fontSize = TextFit.fitFontSizeSp(context, text, config), textColor = color)
 +        }
 +        emitter.updateView(compositionResult.remoteViews)
 +    }
@@ -1218,10 +1220,10 @@ index 0000000..6027df2
 +}
 diff --git a/app/src/main/java/com/valterc/ki2/karoo/datatypes/text/FuelTimerDataType.kt b/app/src/main/java/com/valterc/ki2/karoo/datatypes/text/FuelTimerDataType.kt
 new file mode 100644
-index 0000000..4772a27
+index 0000000..85dfed7
 --- /dev/null
 +++ b/app/src/main/java/com/valterc/ki2/karoo/datatypes/text/FuelTimerDataType.kt
-@@ -0,0 +1,80 @@
+@@ -0,0 +1,81 @@
 +package com.valterc.ki2.karoo.datatypes.text
 +
 +import android.content.Context
@@ -1230,6 +1232,7 @@ index 0000000..4772a27
 +import androidx.glance.appwidget.ExperimentalGlanceRemoteViewsApi
 +import androidx.glance.appwidget.GlanceRemoteViews
 +import com.valterc.ki2.karoo.Ki2ExtensionContext
++import com.valterc.ki2.karoo.datatypes.views.TextFit
 +import com.valterc.ki2.karoo.datatypes.views.TextView
 +import io.hammerhead.karooext.extension.DataTypeImpl
 +import io.hammerhead.karooext.internal.ViewEmitter
@@ -1292,7 +1295,7 @@ index 0000000..4772a27
 +        lastRendered = rendered
 +
 +        val compositionResult = glance.compose(context, DpSize.Unspecified) {
-+            TextView(text, dataAlignment = config.alignment, fontSize = config.textSize, textColor = color)
++            TextView(text, dataAlignment = config.alignment, fontSize = TextFit.fitFontSizeSp(context, text, config), textColor = color)
 +        }
 +        emitter.updateView(compositionResult.remoteViews)
 +    }
@@ -1304,10 +1307,10 @@ index 0000000..4772a27
 +}
 diff --git a/app/src/main/java/com/valterc/ki2/karoo/datatypes/text/GearInchesDataType.kt b/app/src/main/java/com/valterc/ki2/karoo/datatypes/text/GearInchesDataType.kt
 new file mode 100644
-index 0000000..df83c3b
+index 0000000..1633e5c
 --- /dev/null
 +++ b/app/src/main/java/com/valterc/ki2/karoo/datatypes/text/GearInchesDataType.kt
-@@ -0,0 +1,124 @@
+@@ -0,0 +1,126 @@
 +package com.valterc.ki2.karoo.datatypes.text
 +
 +import android.content.Context
@@ -1321,6 +1324,7 @@ index 0000000..df83c3b
 +import com.valterc.ki2.data.shifting.ShiftingInfo
 +import com.valterc.ki2.karoo.Ki2ExtensionContext
 +import com.valterc.ki2.karoo.datatypes.views.NotAvailable
++import com.valterc.ki2.karoo.datatypes.views.TextFit
 +import com.valterc.ki2.karoo.datatypes.views.TextView
 +import com.valterc.ki2.karoo.datatypes.views.Waiting
 +import com.valterc.ki2.karoo.shifting.GearMetrics
@@ -1412,11 +1416,12 @@ index 0000000..df83c3b
 +                    shiftingGearingHelper.rearGearTeethCount,
 +                    wheelCircumference
 +                )
++                val text = decimalFormat.format(gearInches)
 +                glance.compose(context, DpSize.Unspecified) {
 +                    TextView(
-+                        decimalFormat.format(gearInches),
++                        text,
 +                        dataAlignment = config.alignment,
-+                        fontSize = config.textSize
++                        fontSize = TextFit.fitFontSizeSp(context, text, config)
 +                    )
 +                }
 +            } else if (connectionInfo?.isClosed == true) {
@@ -1434,10 +1439,10 @@ index 0000000..df83c3b
 +}
 diff --git a/app/src/main/java/com/valterc/ki2/karoo/datatypes/text/ShiftAdviceDataType.kt b/app/src/main/java/com/valterc/ki2/karoo/datatypes/text/ShiftAdviceDataType.kt
 new file mode 100644
-index 0000000..a4e83c0
+index 0000000..52e77e7
 --- /dev/null
 +++ b/app/src/main/java/com/valterc/ki2/karoo/datatypes/text/ShiftAdviceDataType.kt
-@@ -0,0 +1,186 @@
+@@ -0,0 +1,187 @@
 +package com.valterc.ki2.karoo.datatypes.text
 +
 +import android.content.Context
@@ -1452,6 +1457,7 @@ index 0000000..a4e83c0
 +import com.valterc.ki2.data.shifting.ShiftingInfo
 +import com.valterc.ki2.karoo.Ki2ExtensionContext
 +import com.valterc.ki2.karoo.datatypes.views.NotAvailable
++import com.valterc.ki2.karoo.datatypes.views.TextFit
 +import com.valterc.ki2.karoo.datatypes.views.TextView
 +import com.valterc.ki2.karoo.datatypes.views.Waiting
 +import com.valterc.ki2.karoo.shifting.GearMetrics
@@ -1571,7 +1577,7 @@ index 0000000..a4e83c0
 +                    TextView(
 +                        text,
 +                        dataAlignment = config.alignment,
-+                        fontSize = config.textSize,
++                        fontSize = TextFit.fitFontSizeSp(context, text, config),
 +                        textColor = color
 +                    )
 +                }
@@ -1626,10 +1632,10 @@ index 0000000..a4e83c0
 +}
 diff --git a/app/src/main/java/com/valterc/ki2/karoo/datatypes/text/SpeedAtCadenceDataType.kt b/app/src/main/java/com/valterc/ki2/karoo/datatypes/text/SpeedAtCadenceDataType.kt
 new file mode 100644
-index 0000000..7be9596
+index 0000000..0c6a6ac
 --- /dev/null
 +++ b/app/src/main/java/com/valterc/ki2/karoo/datatypes/text/SpeedAtCadenceDataType.kt
-@@ -0,0 +1,132 @@
+@@ -0,0 +1,134 @@
 +package com.valterc.ki2.karoo.datatypes.text
 +
 +import android.content.Context
@@ -1643,6 +1649,7 @@ index 0000000..7be9596
 +import com.valterc.ki2.data.shifting.ShiftingInfo
 +import com.valterc.ki2.karoo.Ki2ExtensionContext
 +import com.valterc.ki2.karoo.datatypes.views.NotAvailable
++import com.valterc.ki2.karoo.datatypes.views.TextFit
 +import com.valterc.ki2.karoo.datatypes.views.TextView
 +import com.valterc.ki2.karoo.datatypes.views.Waiting
 +import com.valterc.ki2.karoo.shifting.GearMetrics
@@ -1742,11 +1749,12 @@ index 0000000..7be9596
 +                    shiftingGearingHelper.rearGearTeethCount,
 +                    wheelCircumference
 +                )
++                val text = decimalFormat.format(speed)
 +                glance.compose(context, DpSize.Unspecified) {
 +                    TextView(
-+                        decimalFormat.format(speed),
++                        text,
 +                        dataAlignment = config.alignment,
-+                        fontSize = config.textSize
++                        fontSize = TextFit.fitFontSizeSp(context, text, config)
 +                    )
 +                }
 +            } else if (connectionInfo?.isClosed == true) {
@@ -1764,10 +1772,10 @@ index 0000000..7be9596
 +}
 diff --git a/app/src/main/java/com/valterc/ki2/karoo/datatypes/text/SplitPredictorDataType.kt b/app/src/main/java/com/valterc/ki2/karoo/datatypes/text/SplitPredictorDataType.kt
 new file mode 100644
-index 0000000..447a9ad
+index 0000000..9532077
 --- /dev/null
 +++ b/app/src/main/java/com/valterc/ki2/karoo/datatypes/text/SplitPredictorDataType.kt
-@@ -0,0 +1,121 @@
+@@ -0,0 +1,122 @@
 +package com.valterc.ki2.karoo.datatypes.text
 +
 +import android.content.Context
@@ -1777,6 +1785,7 @@ index 0000000..447a9ad
 +import androidx.glance.appwidget.GlanceRemoteViews
 +import com.valterc.ki2.data.preferences.PreferencesView
 +import com.valterc.ki2.karoo.Ki2ExtensionContext
++import com.valterc.ki2.karoo.datatypes.views.TextFit
 +import com.valterc.ki2.karoo.datatypes.views.TextView
 +import com.valterc.ki2.karoo.datatypes.views.Waiting
 +import com.valterc.ki2.karoo.powermetrics.RidePhysics
@@ -1878,7 +1887,7 @@ index 0000000..447a9ad
 +            lastRendered = rendered
 +
 +            val compositionResult = glance.compose(context, DpSize.Unspecified) {
-+                TextView(text, dataAlignment = config.alignment, fontSize = config.textSize, textColor = color)
++                TextView(text, dataAlignment = config.alignment, fontSize = TextFit.fitFontSizeSp(context, text, config), textColor = color)
 +            }
 +            emitter.updateView(compositionResult.remoteViews)
 +        }
@@ -1891,10 +1900,10 @@ index 0000000..447a9ad
 +}
 diff --git a/app/src/main/java/com/valterc/ki2/karoo/datatypes/text/WindGaugeDataType.kt b/app/src/main/java/com/valterc/ki2/karoo/datatypes/text/WindGaugeDataType.kt
 new file mode 100644
-index 0000000..1ba903f
+index 0000000..a71c42e
 --- /dev/null
 +++ b/app/src/main/java/com/valterc/ki2/karoo/datatypes/text/WindGaugeDataType.kt
-@@ -0,0 +1,74 @@
+@@ -0,0 +1,75 @@
 +package com.valterc.ki2.karoo.datatypes.text
 +
 +import android.content.Context
@@ -1903,6 +1912,7 @@ index 0000000..1ba903f
 +import androidx.glance.appwidget.ExperimentalGlanceRemoteViewsApi
 +import androidx.glance.appwidget.GlanceRemoteViews
 +import com.valterc.ki2.karoo.Ki2ExtensionContext
++import com.valterc.ki2.karoo.datatypes.views.TextFit
 +import com.valterc.ki2.karoo.datatypes.views.TextView
 +import io.hammerhead.karooext.extension.DataTypeImpl
 +import io.hammerhead.karooext.internal.ViewEmitter
@@ -1959,7 +1969,7 @@ index 0000000..1ba903f
 +        lastRendered = rendered
 +
 +        val compositionResult = glance.compose(context, DpSize.Unspecified) {
-+            TextView(text, dataAlignment = config.alignment, fontSize = config.textSize, textColor = color)
++            TextView(text, dataAlignment = config.alignment, fontSize = TextFit.fitFontSizeSp(context, text, config), textColor = color)
 +        }
 +        emitter.updateView(compositionResult.remoteViews)
 +    }
@@ -1967,6 +1977,62 @@ index 0000000..1ba903f
 +    private companion object {
 +        val COLOR_GREEN = Color(0xFF34C759)
 +        val COLOR_RED = Color(0xFFFF453A)
++    }
++}
+diff --git a/app/src/main/java/com/valterc/ki2/karoo/datatypes/views/TextFit.kt b/app/src/main/java/com/valterc/ki2/karoo/datatypes/views/TextFit.kt
+new file mode 100644
+index 0000000..e80a233
+--- /dev/null
++++ b/app/src/main/java/com/valterc/ki2/karoo/datatypes/views/TextFit.kt
+@@ -0,0 +1,50 @@
++package com.valterc.ki2.karoo.datatypes.views
++
++import android.content.Context
++import android.graphics.Paint
++import android.graphics.Typeface
++import io.hammerhead.karooext.models.ViewConfig
++
++/**
++ * Shrinks a data field's font size so its value string fits the field's
++ * actual pixel width at whatever Karoo grid size the user picked, instead of
++ * being clipped or overflowing in narrow (1-column) tiles.
++ *
++ * Karoo hands each field an ideal [ViewConfig.textSize] (sp) sized for its
++ * grid position, tuned for short native values. Our longer strings (e.g.
++ * "0.287▼") can exceed that at small widths, so this measures the actual
++ * rendered width with a matching [Paint] and scales down proportionally
++ * when needed. Mirrors the fit-to-width approach already used natively in
++ * [com.valterc.ki2.karoo.views.GearsProExtensionView].
++ */
++object TextFit {
++
++    private const val WIDTH_SAFETY_FACTOR = 0.90f
++    private const val MIN_SCALE = 0.55f
++    private const val HORIZONTAL_PADDING_DP = 10f // matches TextView.kt's start+end padding
++
++    /** Returns a font size (sp) for [text] that fits within [config]'s pixel width. */
++    fun fitFontSizeSp(context: Context, text: String, config: ViewConfig): Int {
++        val idealSp = config.textSize
++        if (text.isEmpty() || idealSp <= 0) {
++            return idealSp
++        }
++
++        val metrics = context.resources.displayMetrics
++        val paddingPx = HORIZONTAL_PADDING_DP * metrics.density
++        val availableWidthPx = (config.viewSize.first - paddingPx).coerceAtLeast(1f)
++        val maxWidthPx = availableWidthPx * WIDTH_SAFETY_FACTOR
++
++        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
++            typeface = Typeface.MONOSPACE
++            textSize = idealSp * metrics.scaledDensity
++        }
++        val measuredWidthPx = paint.measureText(text)
++        if (measuredWidthPx <= maxWidthPx || measuredWidthPx <= 0f) {
++            return idealSp
++        }
++
++        val scale = (maxWidthPx / measuredWidthPx).coerceIn(MIN_SCALE, 1f)
++        return (idealSp * scale).toInt().coerceAtLeast(1)
 +    }
 +}
 diff --git a/app/src/main/java/com/valterc/ki2/karoo/datatypes/views/TextView.kt b/app/src/main/java/com/valterc/ki2/karoo/datatypes/views/TextView.kt
@@ -2642,10 +2708,10 @@ index d7a8bb6..2c9de8b 100644
  }
 diff --git a/app/src/main/java/com/valterc/ki2/karoo/views/GearsProExtensionView.kt b/app/src/main/java/com/valterc/ki2/karoo/views/GearsProExtensionView.kt
 new file mode 100644
-index 0000000..ed50f7d
+index 0000000..f32340a
 --- /dev/null
 +++ b/app/src/main/java/com/valterc/ki2/karoo/views/GearsProExtensionView.kt
-@@ -0,0 +1,351 @@
+@@ -0,0 +1,366 @@
 +package com.valterc.ki2.karoo.views
 +
 +import android.annotation.SuppressLint
@@ -2734,6 +2800,7 @@ index 0000000..ed50f7d
 +    private var viewScope: CoroutineScope? = null
 +    private var cellWidth: Int = 0
 +    private var baseMainTextSizePx: Float = 0f
++    private var baseTeethTextSizePx: Float = 0f
 +    private var lastSignature: String? = null
 +
 +    private var textViewWaitingForData: TextView? = null
@@ -2807,8 +2874,9 @@ index 0000000..ed50f7d
 +        val cellHeight = viewConfig.viewSize.second.toFloat()
 +        cellWidth = viewConfig.viewSize.first
 +        baseMainTextSizePx = (cellHeight * 0.40f).coerceAtLeast(24f)
++        baseTeethTextSizePx = (cellHeight * 0.15f).coerceIn(14f, 40f)
 +        textViewMain?.setTextSize(TypedValue.COMPLEX_UNIT_PX, baseMainTextSizePx)
-+        textViewTeeth?.setTextSize(TypedValue.COMPLEX_UNIT_PX, (cellHeight * 0.15f).coerceIn(14f, 40f))
++        textViewTeeth?.setTextSize(TypedValue.COMPLEX_UNIT_PX, baseTeethTextSizePx)
 +
 +        if (karooTheme == KarooTheme.WHITE) {
 +            textViewWaitingForData?.setTextColor(context.getColor(R.color.hh_black))
@@ -2966,7 +3034,20 @@ index 0000000..ed50f7d
 +            }
 +        }
 +
++        // Fit-to-width: same treatment as the main gear row above, so the
++        // teeth/development line never gets clipped in a narrow tile.
++        textViewTeeth.setTextSize(TypedValue.COMPLEX_UNIT_PX, baseTeethTextSizePx)
 +        textViewTeeth.text = teethText
++        if (cellWidth > 0 && teethText.isNotEmpty()) {
++            val neededTeeth = textViewTeeth.paint.measureText(teethText)
++            val maxTeethWidth = cellWidth * 0.92f
++            if (neededTeeth > maxTeethWidth) {
++                textViewTeeth.setTextSize(
++                    TypedValue.COMPLEX_UNIT_PX,
++                    baseTeethTextSizePx * maxTeethWidth / neededTeeth
++                )
++            }
++        }
 +
 +        // Di2 battery pill
 +        batteryInfo?.let { batteryInfo ->
@@ -3043,6 +3124,57 @@ index daac447..ebacd72 100644
                      jsonObject.get(KEY_DESCRIPTION).getAsString(),
                      Instant.parse(jsonObject.get(KEY_PUBLISHED_DATE).getAsString()),
                      jsonObject.get(KEY_URL).getAsString(),
+diff --git a/app/src/main/res/drawable/ic_hh_chart.xml b/app/src/main/res/drawable/ic_hh_chart.xml
+new file mode 100644
+index 0000000..597a1fa
+--- /dev/null
++++ b/app/src/main/res/drawable/ic_hh_chart.xml
+@@ -0,0 +1,11 @@
++<?xml version="1.0" encoding="utf-8"?>
++<vector xmlns:android="http://schemas.android.com/apk/res/android"
++    android:width="38dp"
++    android:height="38dp"
++    android:viewportWidth="38"
++    android:viewportHeight="38">
++    <path
++        android:fillColor="#9fb3bd"
++        android:pathData="M5,24L12,24 12,33 5,33z M15,15L22,15 22,33 15,33z M25,6L32,6 32,33 25,33z"
++        android:fillType="evenOdd"/>
++</vector>
+diff --git a/app/src/main/res/drawable/ic_hh_fuel.xml b/app/src/main/res/drawable/ic_hh_fuel.xml
+new file mode 100644
+index 0000000..90c7855
+--- /dev/null
++++ b/app/src/main/res/drawable/ic_hh_fuel.xml
+@@ -0,0 +1,11 @@
++<?xml version="1.0" encoding="utf-8"?>
++<vector xmlns:android="http://schemas.android.com/apk/res/android"
++    android:width="38dp"
++    android:height="38dp"
++    android:viewportWidth="38"
++    android:viewportHeight="38">
++    <path
++        android:fillColor="#9fb3bd"
++        android:pathData="M19,4L27,13 27,33 11,33 11,13z M14,18L14,29 24,29 24,18z"
++        android:fillType="evenOdd"/>
++</vector>
+diff --git a/app/src/main/res/drawable/ic_hh_wind.xml b/app/src/main/res/drawable/ic_hh_wind.xml
+new file mode 100644
+index 0000000..4185d99
+--- /dev/null
++++ b/app/src/main/res/drawable/ic_hh_wind.xml
+@@ -0,0 +1,11 @@
++<?xml version="1.0" encoding="utf-8"?>
++<vector xmlns:android="http://schemas.android.com/apk/res/android"
++    android:width="38dp"
++    android:height="38dp"
++    android:viewportWidth="38"
++    android:viewportHeight="38">
++    <path
++        android:fillColor="#9fb3bd"
++        android:pathData="M6,7L26,7 26,10 6,10z M10,16L34,16 34,19 10,19z M6,25L20,25 20,28 6,28z"
++        android:fillType="evenOdd"/>
++</vector>
 diff --git a/app/src/main/res/layout/view_karoo_gears_pro.xml b/app/src/main/res/layout/view_karoo_gears_pro.xml
 new file mode 100644
 index 0000000..760a62b
@@ -3565,7 +3697,7 @@ index 46695b9..266ac60 100644
      <string name="dash">-</string>
  
 diff --git a/app/src/main/res/xml/karoo_extension_info.xml b/app/src/main/res/xml/karoo_extension_info.xml
-index 7518e85..158e7fe 100644
+index 7518e85..66a242c 100644
 --- a/app/src/main/res/xml/karoo_extension_info.xml
 +++ b/app/src/main/res/xml/karoo_extension_info.xml
 @@ -1,6 +1,6 @@
@@ -3598,7 +3730,7 @@ index 7518e85..158e7fe 100644
 +        description="Rear shift recommendation to hit target cadence at current speed."
 +        displayName="Shift Advice"
 +        graphical="true"
-+        icon="@drawable/ic_hh_gear"
++        icon="@drawable/ic_hh_shift"
 +        typeId="DATATYPE_SHIFT_ADVICE" />
 +
 +    <DataType
@@ -3612,35 +3744,35 @@ index 7518e85..158e7fe 100644
 +        description="Live CdA (m²) of the current aero test segment. Map a Di2 button to Aero: New Segment for A/B position testing."
 +        displayName="Aero Score"
 +        graphical="true"
-+        icon="@drawable/ic_hh_gear"
++        icon="@drawable/ic_hh_wind"
 +        typeId="DATATYPE_AERO_SCORE" />
 +
 +    <DataType
 +        description="Apparent wind in m/s from the calibrated CdA. + headwind, − tailwind/drafting."
 +        displayName="Wind"
 +        graphical="true"
-+        icon="@drawable/ic_hh_gear"
++        icon="@drawable/ic_hh_wind"
 +        typeId="DATATYPE_WIND_GAUGE" />
 +
 +    <DataType
 +        description="Carb balance vs your g/h target. Map a Di2 button to Fuel: Log Intake."
 +        displayName="Fuel Balance"
 +        graphical="true"
-+        icon="@drawable/ic_hh_gear"
++        icon="@drawable/ic_hh_fuel"
 +        typeId="DATATYPE_FUEL_STATE" />
 +
 +    <DataType
 +        description="Countdown to the next carb portion. Shows EAT when due."
 +        displayName="Fuel Timer"
 +        graphical="true"
-+        icon="@drawable/ic_hh_gear"
++        icon="@drawable/ic_hh_fuel"
 +        typeId="DATATYPE_FUEL_TIMER" />
 +
 +    <DataType
 +        description="Projected bike split for your race distance at current Normalized Power and calibrated CdA."
 +        displayName="Split Predictor"
 +        graphical="true"
-+        icon="@drawable/ic_hh_gear"
++        icon="@drawable/ic_hh_chart"
 +        typeId="DATATYPE_SPLIT_PREDICTOR" />
 +
  </ExtensionInfo>
