@@ -12,14 +12,14 @@ index 267594c..a31b794 100644
          targetSdk 34
  		
 diff --git a/app/manifest-template.json b/app/manifest-template.json
-index 1b0113b..fe24be5 100644
+index 1b0113b..6e3dcc7 100644
 --- a/app/manifest-template.json
 +++ b/app/manifest-template.json
 @@ -1,8 +1,8 @@
  {
 -  "label": "Ki2",
 -  "packageName": "com.valterc.ki2",
-+  "label": "Ki2 Pro",
++  "label": "Lucaéro",
 +  "packageName": "com.valterc.ki2.pro",
    "iconUrl": "https://github.com/valterc/ki2/releases/latest/download/icon.png",
 -  "latestApkUrl": "https://github.com/valterc/ki2/releases/latest/download/ki2-release.apk",
@@ -4189,13 +4189,13 @@ index 7b8cd09..e83eb88 100644
  </resources>
 \ No newline at end of file
 diff --git a/app/src/main/res/values/strings.xml b/app/src/main/res/values/strings.xml
-index 46695b9..266ac60 100644
+index 46695b9..23a6ce1 100644
 --- a/app/src/main/res/values/strings.xml
 +++ b/app/src/main/res/values/strings.xml
 @@ -1,5 +1,5 @@
  <resources>
 -    <string name="app_name">Ki2</string>
-+    <string name="app_name">Ki2 Pro</string>
++    <string name="app_name">Lucaéro</string>
  
      <string name="dash">-</string>
  
