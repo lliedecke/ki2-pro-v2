@@ -3678,6 +3678,134 @@ index 0000000..4185d99
 +        android:pathData="M6,7L26,7 26,10 6,10z M10,16L34,16 34,19 10,19z M6,25L20,25 20,28 6,28z"
 +        android:fillType="evenOdd"/>
 +</vector>
+diff --git a/app/src/main/res/layout/activity_main.xml b/app/src/main/res/layout/activity_main.xml
+index 6323bf0..2810d48 100644
+--- a/app/src/main/res/layout/activity_main.xml
++++ b/app/src/main/res/layout/activity_main.xml
+@@ -13,7 +13,7 @@
+         <androidx.constraintlayout.widget.ConstraintLayout
+             android:layout_width="match_parent"
+             android:layout_height="wrap_content"
+-            android:background="@color/hh_yellow"
++            android:background="@color/lucaero_sky"
+             android:orientation="vertical">
+ 
+             <TextView
+diff --git a/app/src/main/res/layout/fragment_devices_list.xml b/app/src/main/res/layout/fragment_devices_list.xml
+index dc52f13..2e2d066 100644
+--- a/app/src/main/res/layout/fragment_devices_list.xml
++++ b/app/src/main/res/layout/fragment_devices_list.xml
+@@ -38,7 +38,7 @@
+         android:layout_marginBottom="10dp"
+         android:clickable="true"
+         android:contentDescription="@string/text_add_device"
+-        app:backgroundTint="@color/hh_yellow"
++        app:backgroundTint="@color/lucaero_mint"
+         app:collapsedSize="50dp"
+         app:icon="@drawable/ic_add"
+         app:layout_constraintBottom_toBottomOf="parent"
+diff --git a/app/src/main/res/layout/fragment_update_overlay.xml b/app/src/main/res/layout/fragment_update_overlay.xml
+index d07684b..c451637 100644
+--- a/app/src/main/res/layout/fragment_update_overlay.xml
++++ b/app/src/main/res/layout/fragment_update_overlay.xml
+@@ -4,7 +4,7 @@
+     xmlns:tools="http://schemas.android.com/tools"
+     android:layout_width="match_parent"
+     android:layout_height="match_parent"
+-    android:background="@color/hh_yellow_dark"
++    android:background="@color/lucaero_sky_dark"
+     tools:context=".fragments.update.overlay.UpdateOverlayFragment">
+ 
+     <TextView
+diff --git a/app/src/main/res/layout/view_item_add_device.xml b/app/src/main/res/layout/view_item_add_device.xml
+index 5a44a80..502b8e1 100644
+--- a/app/src/main/res/layout/view_item_add_device.xml
++++ b/app/src/main/res/layout/view_item_add_device.xml
+@@ -1,42 +1,42 @@
+-<?xml version="1.0" encoding="utf-8"?>
+-<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+-    xmlns:app="http://schemas.android.com/apk/res-auto"
+-    android:layout_width="match_parent"
+-    android:layout_height="wrap_content"
+-    xmlns:tools="http://schemas.android.com/tools">
+-
+-    <ImageView
+-        android:id="@+id/imageview_add_device_item_icon"
+-        android:layout_width="wrap_content"
+-        android:layout_height="wrap_content"
+-        android:layout_marginStart="10dp"
+-        android:layout_marginTop="2dp"
+-        app:layout_constraintBottom_toBottomOf="parent"
+-        app:layout_constraintStart_toStartOf="parent"
+-        app:layout_constraintTop_toTopOf="parent"
+-        app:srcCompat="@drawable/ic_memory"
+-        android:contentDescription="@string/text_sensor" />
+-
+-    <TextView
+-        android:id="@+id/textview_add_device_item_name"
+-        android:layout_width="wrap_content"
+-        android:layout_height="wrap_content"
+-        android:layout_marginStart="10dp"
+-        android:textColor="@color/hh_black"
+-        app:layout_constraintBottom_toBottomOf="parent"
+-        app:layout_constraintStart_toEndOf="@+id/imageview_add_device_item_icon"
+-        app:layout_constraintTop_toTopOf="parent"
+-        tools:text="Device Name" />
+-
+-    <Button
+-        android:id="@+id/button_add_device_item_add"
+-        android:layout_width="wrap_content"
+-        android:layout_height="wrap_content"
+-        android:layout_marginEnd="10dp"
+-        android:text="@string/text_add"
+-        app:backgroundTint="@color/hh_yellow"
+-        app:layout_constraintBottom_toBottomOf="parent"
+-        app:layout_constraintEnd_toEndOf="parent"
+-        app:layout_constraintTop_toTopOf="parent" />
+-
++<?xml version="1.0" encoding="utf-8"?>
++<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
++    xmlns:app="http://schemas.android.com/apk/res-auto"
++    android:layout_width="match_parent"
++    android:layout_height="wrap_content"
++    xmlns:tools="http://schemas.android.com/tools">
++
++    <ImageView
++        android:id="@+id/imageview_add_device_item_icon"
++        android:layout_width="wrap_content"
++        android:layout_height="wrap_content"
++        android:layout_marginStart="10dp"
++        android:layout_marginTop="2dp"
++        app:layout_constraintBottom_toBottomOf="parent"
++        app:layout_constraintStart_toStartOf="parent"
++        app:layout_constraintTop_toTopOf="parent"
++        app:srcCompat="@drawable/ic_memory"
++        android:contentDescription="@string/text_sensor" />
++
++    <TextView
++        android:id="@+id/textview_add_device_item_name"
++        android:layout_width="wrap_content"
++        android:layout_height="wrap_content"
++        android:layout_marginStart="10dp"
++        android:textColor="@color/hh_black"
++        app:layout_constraintBottom_toBottomOf="parent"
++        app:layout_constraintStart_toEndOf="@+id/imageview_add_device_item_icon"
++        app:layout_constraintTop_toTopOf="parent"
++        tools:text="Device Name" />
++
++    <Button
++        android:id="@+id/button_add_device_item_add"
++        android:layout_width="wrap_content"
++        android:layout_height="wrap_content"
++        android:layout_marginEnd="10dp"
++        android:text="@string/text_add"
++        app:backgroundTint="@color/lucaero_mint"
++        app:layout_constraintBottom_toBottomOf="parent"
++        app:layout_constraintEnd_toEndOf="parent"
++        app:layout_constraintTop_toTopOf="parent" />
++
+ </androidx.constraintlayout.widget.ConstraintLayout>
+\ No newline at end of file
 diff --git a/app/src/main/res/layout/view_karoo_gears_pro.xml b/app/src/main/res/layout/view_karoo_gears_pro.xml
 new file mode 100644
 index 0000000..760a62b
@@ -3855,6 +3983,23 @@ index 7546074..627e706 100644
      </string-array>
  
      <string-array name="preference_titles_battery_level_low">
+diff --git a/app/src/main/res/values/colors.xml b/app/src/main/res/values/colors.xml
+index 507e685..020a62e 100644
+--- a/app/src/main/res/values/colors.xml
++++ b/app/src/main/res/values/colors.xml
+@@ -27,6 +27,12 @@
+     <color name="hh_yellow">#F8E400</color>
+     <color name="hh_yellow_dark">#cbba00</color>
+     <color name="hh_yellow_darker">#baa900</color>
++
++    <!-- Lucaéro brand palette: aero sky cyan + mint, replacing the yellow brand colors above (kept for the semantic amber/warning uses elsewhere in the app). -->
++    <color name="lucaero_sky">#4DD8E8</color>
++    <color name="lucaero_sky_dark">#22B8CC</color>
++    <color name="lucaero_mint">#7FE8C4</color>
++    <color name="lucaero_mint_dark">#3FBE99</color>
+     <color name="hh_black">#1b2d2d</color>
+     <color name="hh_black_dark">#102020</color>
+     <color name="hh_dark_grey">#636363</color>
 diff --git a/app/src/main/res/values/preferences_global.xml b/app/src/main/res/values/preferences_global.xml
 index 7b8cd09..e83eb88 100644
 --- a/app/src/main/res/values/preferences_global.xml
@@ -4199,6 +4344,173 @@ index 46695b9..23a6ce1 100644
  
      <string name="dash">-</string>
  
+diff --git a/app/src/main/res/values/styles.xml b/app/src/main/res/values/styles.xml
+index 6f8c997..3fb3520 100644
+--- a/app/src/main/res/values/styles.xml
++++ b/app/src/main/res/values/styles.xml
+@@ -1,33 +1,51 @@
+-<?xml version="1.0" encoding="utf-8"?>
+-<resources>
+-
+-    <style name="ShapeAppearanceOverlayLeftSide" parent="">
+-        <item name="cornerFamily">rounded</item>
+-        <item name="cornerSizeTopLeft">0dp</item>
+-        <item name="cornerSizeBottomLeft">0dp</item>
+-        <item name="cornerSizeTopRight">25dp</item>
+-        <item name="cornerSizeBottomRight">25dp</item>
+-    </style>
+-
+-    <style name="ShapeAppearanceOverlayRightSide" parent="">
+-        <item name="cornerFamily">rounded</item>
+-        <item name="cornerSizeTopLeft">25dp</item>
+-        <item name="cornerSizeBottomLeft">25dp</item>
+-        <item name="cornerSizeTopRight">0dp</item>
+-        <item name="cornerSizeBottomRight">0dp</item>
+-    </style>
+-
+-    <style name="AlertDialogStyle" parent="Theme.MaterialComponents.Light.Dialog">
+-        <item name="buttonBarNegativeButtonStyle">@style/NegativeButtonStyle</item>
+-        <item name="buttonBarPositiveButtonStyle">@style/PositiveButtonStyle</item>
+-    </style>
+-
+-    <style name="NegativeButtonStyle" parent="Widget.MaterialComponents.Button.TextButton.Dialog">
+-        <item name="android:textColor">@color/hh_dark_blue</item>
+-    </style>
+-
+-    <style name="PositiveButtonStyle" parent="Widget.MaterialComponents.Button.TextButton.Dialog">
+-        <item name="android:textColor">@color/hh_dark_blue</item>
+-    </style>
+-
++<?xml version="1.0" encoding="utf-8"?>
++<resources>
++
++    <!-- Lucaéro modern shape system: soft rounded corners app-wide via the
++         Material shape-theming attributes (buttons, cards, dialogs, chips)
++         instead of the sharper default corners. -->
++    <style name="ShapeAppearance.Lucaero.Small" parent="ShapeAppearance.MaterialComponents.SmallComponent">
++        <item name="cornerFamily">rounded</item>
++        <item name="cornerSize">10dp</item>
++    </style>
++
++    <style name="ShapeAppearance.Lucaero.Medium" parent="ShapeAppearance.MaterialComponents.MediumComponent">
++        <item name="cornerFamily">rounded</item>
++        <item name="cornerSize">14dp</item>
++    </style>
++
++    <style name="ShapeAppearance.Lucaero.Large" parent="ShapeAppearance.MaterialComponents.LargeComponent">
++        <item name="cornerFamily">rounded</item>
++        <item name="cornerSize">18dp</item>
++    </style>
++
++    <style name="ShapeAppearanceOverlayLeftSide" parent="">
++        <item name="cornerFamily">rounded</item>
++        <item name="cornerSizeTopLeft">0dp</item>
++        <item name="cornerSizeBottomLeft">0dp</item>
++        <item name="cornerSizeTopRight">25dp</item>
++        <item name="cornerSizeBottomRight">25dp</item>
++    </style>
++
++    <style name="ShapeAppearanceOverlayRightSide" parent="">
++        <item name="cornerFamily">rounded</item>
++        <item name="cornerSizeTopLeft">25dp</item>
++        <item name="cornerSizeBottomLeft">25dp</item>
++        <item name="cornerSizeTopRight">0dp</item>
++        <item name="cornerSizeBottomRight">0dp</item>
++    </style>
++
++    <style name="AlertDialogStyle" parent="Theme.MaterialComponents.Light.Dialog">
++        <item name="buttonBarNegativeButtonStyle">@style/NegativeButtonStyle</item>
++        <item name="buttonBarPositiveButtonStyle">@style/PositiveButtonStyle</item>
++    </style>
++
++    <style name="NegativeButtonStyle" parent="Widget.MaterialComponents.Button.TextButton.Dialog">
++        <item name="android:textColor">@color/hh_dark_blue</item>
++    </style>
++
++    <style name="PositiveButtonStyle" parent="Widget.MaterialComponents.Button.TextButton.Dialog">
++        <item name="android:textColor">@color/hh_dark_blue</item>
++    </style>
++
+ </resources>
+\ No newline at end of file
+diff --git a/app/src/main/res/values/themes.xml b/app/src/main/res/values/themes.xml
+index 067c3bd..967a5cc 100644
+--- a/app/src/main/res/values/themes.xml
++++ b/app/src/main/res/values/themes.xml
+@@ -1,14 +1,14 @@
+ <resources xmlns:tools="http://schemas.android.com/tools">
+ 
+     <style name="Theme.Ki2.NoActionBar" parent="Theme.MaterialComponents.Light.NoActionBar">
+-        <!-- Primary brand color. -->
+-        <item name="colorPrimary">@color/hh_yellow_darker</item>
+-        <item name="colorPrimaryVariant">@color/hh_yellow_dark</item>
++        <!-- Primary brand color: Lucaéro aero sky cyan (was the yellow brand color). -->
++        <item name="colorPrimary">@color/lucaero_sky</item>
++        <item name="colorPrimaryVariant">@color/lucaero_sky_dark</item>
+         <item name="colorOnPrimary">@color/hh_black</item>
+ 
+-        <!-- Secondary brand color. -->
+-        <item name="colorSecondary">@color/hh_light_blue_dark</item>
+-        <item name="colorSecondaryVariant">@color/hh_dark_blue</item>
++        <!-- Secondary brand color: Lucaéro mint. -->
++        <item name="colorSecondary">@color/lucaero_mint</item>
++        <item name="colorSecondaryVariant">@color/lucaero_mint_dark</item>
+         <item name="colorOnSecondary">@color/hh_black</item>
+ 
+         <!-- Status bar color. -->
+@@ -16,17 +16,22 @@
+ 
+         <!-- Dialog preference style. -->
+         <item name="dialogPreferenceStyle">@style/Theme.Ki2.Preference.Dialog</item>
++
++        <!-- Modern rounded shape system app-wide. -->
++        <item name="shapeAppearanceSmallComponent">@style/ShapeAppearance.Lucaero.Small</item>
++        <item name="shapeAppearanceMediumComponent">@style/ShapeAppearance.Lucaero.Medium</item>
++        <item name="shapeAppearanceLargeComponent">@style/ShapeAppearance.Lucaero.Large</item>
+     </style>
+ 
+     <style name="Theme.Ki2.ActionBar" parent="Theme.MaterialComponents.Light.DarkActionBar">
+-        <!-- Primary brand color. -->
+-        <item name="colorPrimary">@color/hh_yellow_darker</item>
+-        <item name="colorPrimaryVariant">@color/hh_yellow_dark</item>
++        <!-- Primary brand color: Lucaéro aero sky cyan (was the yellow brand color). -->
++        <item name="colorPrimary">@color/lucaero_sky</item>
++        <item name="colorPrimaryVariant">@color/lucaero_sky_dark</item>
+         <item name="colorOnPrimary">@color/hh_black</item>
+ 
+-        <!-- Secondary brand color. -->
+-        <item name="colorSecondary">@color/hh_light_blue_dark</item>
+-        <item name="colorSecondaryVariant">@color/hh_dark_blue</item>
++        <!-- Secondary brand color: Lucaéro mint. -->
++        <item name="colorSecondary">@color/lucaero_mint</item>
++        <item name="colorSecondaryVariant">@color/lucaero_mint_dark</item>
+         <item name="colorOnSecondary">@color/hh_black</item>
+ 
+         <!-- Status bar color. -->
+@@ -34,6 +39,11 @@
+ 
+         <!-- Dialog preference style. -->
+         <item name="dialogPreferenceStyle">@style/Theme.Ki2.Preference.Dialog</item>
++
++        <!-- Modern rounded shape system app-wide. -->
++        <item name="shapeAppearanceSmallComponent">@style/ShapeAppearance.Lucaero.Small</item>
++        <item name="shapeAppearanceMediumComponent">@style/ShapeAppearance.Lucaero.Medium</item>
++        <item name="shapeAppearanceLargeComponent">@style/ShapeAppearance.Lucaero.Large</item>
+     </style>
+ 
+     <style name="Theme.Ki2.NoActionBar.Blue" parent="Theme.MaterialComponents.Light.NoActionBar">
+@@ -52,6 +62,11 @@
+ 
+         <!-- Dialog preference style. -->
+         <item name="dialogPreferenceStyle">@style/Theme.Ki2.Preference.Dialog</item>
++
++        <!-- Modern rounded shape system app-wide (matches the other Lucaéro themes). -->
++        <item name="shapeAppearanceSmallComponent">@style/ShapeAppearance.Lucaero.Small</item>
++        <item name="shapeAppearanceMediumComponent">@style/ShapeAppearance.Lucaero.Medium</item>
++        <item name="shapeAppearanceLargeComponent">@style/ShapeAppearance.Lucaero.Large</item>
+     </style>
+ 
+     <style name="Theme.Ki2.Preference.Dialog" parent="Preference.Material">
 diff --git a/app/src/main/res/xml/karoo_extension_info.xml b/app/src/main/res/xml/karoo_extension_info.xml
 index 7518e85..6d95ecb 100644
 --- a/app/src/main/res/xml/karoo_extension_info.xml
