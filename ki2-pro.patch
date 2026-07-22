@@ -964,14 +964,15 @@ index 315bd0a..681da58 100644
  }
 \ No newline at end of file
 diff --git a/app/src/main/java/com/valterc/ki2/karoo/Ki2ExtensionService.kt b/app/src/main/java/com/valterc/ki2/karoo/Ki2ExtensionService.kt
-index 146985f..d86fd0a 100644
+index 146985f..a9ade97 100644
 --- a/app/src/main/java/com/valterc/ki2/karoo/Ki2ExtensionService.kt
 +++ b/app/src/main/java/com/valterc/ki2/karoo/Ki2ExtensionService.kt
-@@ -5,23 +5,32 @@ import android.content.Intent
+@@ -5,23 +5,34 @@ import android.content.Intent
  import com.valterc.ki2.BuildConfig
  import com.valterc.ki2.data.device.DeviceId
  import com.valterc.ki2.karoo.battery.BatteryAlertHandler
 +import com.valterc.ki2.karoo.datatypes.text.AeroScoreDataType
++import com.valterc.ki2.karoo.datatypes.text.AeroWattsDataType
  import com.valterc.ki2.karoo.datatypes.text.FrontGearIndexDataType
  import com.valterc.ki2.karoo.datatypes.text.FrontGearSizeDataType
  import com.valterc.ki2.karoo.datatypes.text.FrontShiftCountDataType
@@ -991,6 +992,7 @@ index 146985f..d86fd0a 100644
  import com.valterc.ki2.karoo.datatypes.text.ShiftingBatteryPercentageDataType
  import com.valterc.ki2.karoo.datatypes.text.ShiftingModeDataType
 +import com.valterc.ki2.karoo.datatypes.text.SpeedAtCadenceDataType
++import com.valterc.ki2.karoo.datatypes.visual.AeroVisualDataType
  import com.valterc.ki2.karoo.datatypes.visual.BikeBatteryVisualDataType
  import com.valterc.ki2.karoo.datatypes.visual.DrivetrainIndexVisualDataType
  import com.valterc.ki2.karoo.datatypes.visual.DrivetrainSizeVisualDataType
@@ -1000,7 +1002,7 @@ index 146985f..d86fd0a 100644
  import com.valterc.ki2.karoo.datatypes.visual.GearsSizeVisualDataType
  import com.valterc.ki2.karoo.overlay.OverlayWindowHandler
  import com.valterc.ki2.karoo.shifting.ShiftingAudioAlertHandler
-@@ -38,14 +47,14 @@ import kotlinx.coroutines.delay
+@@ -38,14 +49,14 @@ import kotlinx.coroutines.delay
  import kotlinx.coroutines.launch
  import timber.log.Timber
  
@@ -1017,7 +1019,7 @@ index 146985f..d86fd0a 100644
                      Ki2ExtensionService::class.java.name
                  )
              )
-@@ -73,10 +82,19 @@ class Ki2ExtensionService : KarooExtension("ki2", BuildConfig.VERSION_NAME) {
+@@ -73,10 +84,21 @@ class Ki2ExtensionService : KarooExtension("ki2", BuildConfig.VERSION_NAME) {
              ShiftCountDataType(extensionContext),
              FrontShiftCountDataType(extensionContext),
              RearShiftCountDataType(extensionContext),
@@ -1025,6 +1027,7 @@ index 146985f..d86fd0a 100644
 +            SpeedAtCadenceDataType(extensionContext),
 +            ShiftAdviceDataType(extensionContext),
 +            AeroScoreDataType(extensionContext),
++            AeroWattsDataType(extensionContext),
 +            WindGaugeDataType(extensionContext),
 +            FuelStateDataType(extensionContext),
 +            FuelTimerDataType(extensionContext),
@@ -1034,6 +1037,7 @@ index 146985f..d86fd0a 100644
              GearsSizeVisualDataType(extensionContext),
              GearsDetailedVisualDataType(extensionContext),
 +            GearsProVisualDataType(extensionContext),
++            AeroVisualDataType(extensionContext),
              DrivetrainIndexVisualDataType(extensionContext),
              DrivetrainSizeVisualDataType(extensionContext),
              BikeBatteryVisualDataType(extensionContext),
@@ -1123,6 +1127,121 @@ index 0000000..5b9778d
 +            }
 +        }
 +        val text = String.format(Locale.US, "%.3f%s", cda, suffix)
++
++        val rendered = text to color
++        if (rendered == lastRendered) return
++        lastRendered = rendered
++
++        val compositionResult = glance.compose(context, DpSize.Unspecified) {
++            TextView(text, dataAlignment = config.alignment, fontSize = TextFit.fitFontSizeSp(context, text, config), textColor = color)
++        }
++        emitter.updateView(compositionResult.remoteViews)
++    }
++
++    private companion object {
++        val COLOR_GREEN = Color(0xFF34C759)
++        val COLOR_RED = Color(0xFFFF453A)
++    }
++}
+diff --git a/app/src/main/java/com/valterc/ki2/karoo/datatypes/text/AeroWattsDataType.kt b/app/src/main/java/com/valterc/ki2/karoo/datatypes/text/AeroWattsDataType.kt
+new file mode 100644
+index 0000000..5490740
+--- /dev/null
++++ b/app/src/main/java/com/valterc/ki2/karoo/datatypes/text/AeroWattsDataType.kt
+@@ -0,0 +1,109 @@
++package com.valterc.ki2.karoo.datatypes.text
++
++import android.content.Context
++import androidx.compose.ui.graphics.Color
++import androidx.compose.ui.unit.DpSize
++import androidx.glance.appwidget.ExperimentalGlanceRemoteViewsApi
++import androidx.glance.appwidget.GlanceRemoteViews
++import com.valterc.ki2.data.preferences.PreferencesView
++import com.valterc.ki2.karoo.Ki2ExtensionContext
++import com.valterc.ki2.karoo.datatypes.views.TextFit
++import com.valterc.ki2.karoo.datatypes.views.TextView
++import com.valterc.ki2.karoo.datatypes.views.Waiting
++import com.valterc.ki2.karoo.powermetrics.RidePhysics
++import io.hammerhead.karooext.extension.DataTypeImpl
++import io.hammerhead.karooext.internal.ViewEmitter
++import io.hammerhead.karooext.models.ShowCustomStreamState
++import io.hammerhead.karooext.models.UpdateGraphicConfig
++import io.hammerhead.karooext.models.ViewConfig
++import kotlinx.coroutines.CoroutineScope
++import kotlinx.coroutines.Dispatchers
++import kotlinx.coroutines.Job
++import kotlinx.coroutines.cancel
++import kotlinx.coroutines.launch
++import java.util.function.Consumer
++import kotlin.math.roundToInt
++
++/**
++ * Watts gained or lost to aero drag right now, versus the calibrated
++ * baseline CdA, at the current speed.
++ *
++ * Negative = saving watts (current position is more aero than baseline).
++ * Positive = losing watts (current position is less aero than baseline).
++ */
++@OptIn(ExperimentalGlanceRemoteViewsApi::class)
++class AeroWattsDataType(private val extensionContext: Ki2ExtensionContext) :
++    DataTypeImpl(extensionContext.extension, "DATATYPE_AERO_WATTS") {
++
++    private val glance = GlanceRemoteViews()
++    private var lastRendered: Pair<String, Color?>? = null
++    private var preferencesView: PreferencesView? = null
++
++    override fun startView(context: Context, config: ViewConfig, emitter: ViewEmitter) {
++        emitter.onNext(UpdateGraphicConfig(showHeader = true))
++        emitter.onNext(ShowCustomStreamState(message = "", color = null))
++
++        val viewScope = CoroutineScope(Dispatchers.IO + Job())
++
++        val preferencesConsumer = Consumer<PreferencesView> { preferences ->
++            preferencesView = preferences
++            viewScope.launch { emitViewUpdate(context, config, emitter) }
++        }
++        extensionContext.serviceClient.registerPreferencesWeakListener(preferencesConsumer)
++
++        viewScope.launch {
++            emitViewUpdate(context, config, emitter)
++            extensionContext.aeroEngine.updates.collect {
++                emitViewUpdate(context, config, emitter)
++            }
++        }
++
++        emitter.setCancellable {
++            viewScope.cancel()
++            extensionContext.serviceClient.unregisterPreferencesWeakListener(preferencesConsumer)
++        }
++    }
++
++    private suspend fun emitViewUpdate(context: Context, config: ViewConfig, emitter: ViewEmitter) {
++        val engine = extensionContext.aeroEngine
++        val preferences = preferencesView
++        val currentCda = engine.currentCda()
++        val speed = engine.currentSpeed()
++
++        if (preferences == null || currentCda == null || speed < 1.0) {
++            lastRendered = null
++            val waiting = glance.compose(context, DpSize.Unspecified) {
++                Waiting(dataAlignment = config.alignment)
++            }
++            emitter.updateView(waiting.remoteViews)
++            return
++        }
++
++        val airDensity = preferences.getAirDensity(context)
++        val baselineCda = preferences.getCalibratedCda(context)
++        val deltaWatts = RidePhysics.dragPower(currentCda, airDensity, speed) -
++            RidePhysics.dragPower(baselineCda, airDensity, speed)
++
++        val color = when {
++            deltaWatts <= -3.0 -> COLOR_GREEN
++            deltaWatts >= 3.0 -> COLOR_RED
++            else -> null
++        }
++        val watts = deltaWatts.roundToInt()
++        val text = if (watts > 0) "+${watts}W" else "${watts}W"
 +
 +        val rendered = text to color
 +        if (rendered == lastRendered) return
@@ -2110,6 +2229,24 @@ index 5c19e64..dec72fe 100644
                  fontSize = (fontSize * 0.97).sp,
                  fontFamily = FontFamily.Monospace
              ),
+diff --git a/app/src/main/java/com/valterc/ki2/karoo/datatypes/visual/AeroVisualDataType.kt b/app/src/main/java/com/valterc/ki2/karoo/datatypes/visual/AeroVisualDataType.kt
+new file mode 100644
+index 0000000..53f15c3
+--- /dev/null
++++ b/app/src/main/java/com/valterc/ki2/karoo/datatypes/visual/AeroVisualDataType.kt
+@@ -0,0 +1,12 @@
++package com.valterc.ki2.karoo.datatypes.visual
++
++import com.valterc.ki2.karoo.Ki2ExtensionContext
++import com.valterc.ki2.karoo.datatypes.RenderedVisualDataType
++import com.valterc.ki2.karoo.views.AeroVisualExtensionView
++
++@Suppress("unused")
++class AeroVisualDataType(
++    extensionContext: Ki2ExtensionContext
++) : RenderedVisualDataType(
++    "DATATYPE_AERO_VISUAL", extensionContext,
++    { AeroVisualExtensionView(it) })
 diff --git a/app/src/main/java/com/valterc/ki2/karoo/datatypes/visual/GearsProVisualDataType.kt b/app/src/main/java/com/valterc/ki2/karoo/datatypes/visual/GearsProVisualDataType.kt
 new file mode 100644
 index 0000000..bb4dee6
@@ -2130,10 +2267,10 @@ index 0000000..bb4dee6
 +    { GearsProExtensionView(extensionContext) })
 diff --git a/app/src/main/java/com/valterc/ki2/karoo/powermetrics/AeroEngine.kt b/app/src/main/java/com/valterc/ki2/karoo/powermetrics/AeroEngine.kt
 new file mode 100644
-index 0000000..0e427e1
+index 0000000..9e786dd
 --- /dev/null
 +++ b/app/src/main/java/com/valterc/ki2/karoo/powermetrics/AeroEngine.kt
-@@ -0,0 +1,183 @@
+@@ -0,0 +1,186 @@
 +package com.valterc.ki2.karoo.powermetrics
 +
 +import com.valterc.ki2.data.preferences.PreferencesView
@@ -2284,6 +2421,9 @@ index 0000000..0e427e1
 +
 +    /** Number of clean samples collected in the current segment. */
 +    fun sampleCount(): Int = synchronized(segmentSamples) { segmentSamples.size }
++
++    /** Most recent ground speed sample (m/s), regardless of clean-condition gating. */
++    fun currentSpeed(): Double = speed
 +
 +    /** Rolling CdA estimate of the current segment, or null while insufficient data. */
 +    fun currentCda(): Double? {
@@ -2441,10 +2581,10 @@ index 0000000..62674db
 +}
 diff --git a/app/src/main/java/com/valterc/ki2/karoo/powermetrics/RidePhysics.kt b/app/src/main/java/com/valterc/ki2/karoo/powermetrics/RidePhysics.kt
 new file mode 100644
-index 0000000..e49b822
+index 0000000..536e2aa
 --- /dev/null
 +++ b/app/src/main/java/com/valterc/ki2/karoo/powermetrics/RidePhysics.kt
-@@ -0,0 +1,88 @@
+@@ -0,0 +1,97 @@
 +package com.valterc.ki2.karoo.powermetrics
 +
 +import kotlin.math.abs
@@ -2523,6 +2663,15 @@ index 0000000..e49b822
 +            if (abs(step) < 1e-4) return v
 +        }
 +        return v
++    }
++
++    /**
++     * Steady-state aero drag power (W) at ground speed v (m/s) in still air
++     * for a given CdA. Used to translate a CdA delta into a watts delta.
++     */
++    fun dragPower(cda: Double, airDensity: Double, v: Double): Double {
++        if (cda <= 0 || v <= 0) return 0.0
++        return 0.5 * airDensity * cda * v * v * v
 +    }
 +
 +    /** Median of a collection; 0.0 when empty. */
@@ -2760,6 +2909,135 @@ index d7a8bb6..2c9de8b 100644
 +    }
 +
  }
+diff --git a/app/src/main/java/com/valterc/ki2/karoo/views/AeroVisualExtensionView.kt b/app/src/main/java/com/valterc/ki2/karoo/views/AeroVisualExtensionView.kt
+new file mode 100644
+index 0000000..77f62e2
+--- /dev/null
++++ b/app/src/main/java/com/valterc/ki2/karoo/views/AeroVisualExtensionView.kt
+@@ -0,0 +1,123 @@
++package com.valterc.ki2.karoo.views
++
++import android.annotation.SuppressLint
++import android.view.LayoutInflater
++import android.view.View
++import com.valterc.ki2.R
++import com.valterc.ki2.data.preferences.PreferencesView
++import com.valterc.ki2.karoo.Ki2ExtensionContext
++import com.valterc.ki2.views.RiderAeroView
++import io.hammerhead.karooext.models.ViewConfig
++import kotlinx.coroutines.CoroutineScope
++import kotlinx.coroutines.Dispatchers
++import kotlinx.coroutines.Job
++import kotlinx.coroutines.cancel
++import kotlinx.coroutines.launch
++import java.util.function.Consumer
++
++/**
++ * "Aero Visual": a rider silhouette that tucks into an aero position and
++ * turns green when the current CdA is better than the calibrated baseline,
++ * or sits upright and red when it's worse — a glanceable answer to "am I
++ * aero right now?" without reading a raw CdA number.
++ */
++class AeroVisualExtensionView(context: Ki2ExtensionContext) : Ki2ExtensionView(context) {
++
++    private val preferencesConsumer = Consumer<PreferencesView> { preferences ->
++        preferencesView = preferences
++        updateView()
++    }
++
++    private var preferencesView: PreferencesView? = null
++    private var riderView: RiderAeroView? = null
++    private var viewScope: CoroutineScope? = null
++    private var lastSignature: String? = null
++
++    init {
++        serviceClient.registerPreferencesWeakListener(preferencesConsumer)
++
++        val scope = CoroutineScope(Dispatchers.Main + Job())
++        viewScope = scope
++        scope.launch {
++            extensionContext.aeroEngine.updates.collect {
++                updateView()
++            }
++        }
++    }
++
++    override fun dispose() {
++        super.dispose()
++        viewScope?.cancel()
++        viewScope = null
++        serviceClient.unregisterPreferencesWeakListener(preferencesConsumer)
++    }
++
++    @SuppressLint("InflateParams")
++    override fun createView(layoutInflater: LayoutInflater, viewConfig: ViewConfig): View {
++        val riderView = RiderAeroView(context)
++        this.riderView = riderView
++
++        riderView.forceLayout()
++        riderView.measure(
++            View.MeasureSpec.makeMeasureSpec(viewConfig.viewSize.first, View.MeasureSpec.EXACTLY),
++            View.MeasureSpec.makeMeasureSpec(viewConfig.viewSize.second, View.MeasureSpec.EXACTLY)
++        )
++        riderView.layout(0, 0, riderView.measuredWidth, riderView.measuredHeight)
++
++        riderView.setFrameColor(
++            if (karooTheme == KarooTheme.WHITE) {
++                context.getColor(R.color.hh_black)
++            } else {
++                context.getColor(R.color.white)
++            }
++        )
++
++        updateView()
++        return riderView
++    }
++
++    private fun updateView() {
++        val riderView = riderView ?: return
++        val engine = extensionContext.aeroEngine
++        val preferences = preferencesView
++        val currentCda = engine.currentCda()
++
++        if (preferences == null || currentCda == null) {
++            if (lastSignature == "WAITING") return
++            lastSignature = "WAITING"
++            riderView.setState(0.35f, context.getColor(R.color.hh_light_grey), true, "")
++            viewUpdated()
++            return
++        }
++
++        val baselineCda = preferences.getCalibratedCda(context)
++        val improvement = if (baselineCda > 0) (baselineCda - currentCda) / baselineCda else 0.0
++
++        val (aeroT, color, badge) = when {
++            improvement > 0.01 -> {
++                val strength = (improvement.coerceAtMost(0.15) / 0.15).toFloat()
++                Triple(
++                    0.55f + strength * 0.45f,
++                    context.getColor(R.color.hh_success_green_600),
++                    "AERO"
++                )
++            }
++            improvement < -0.01 -> {
++                val strength = ((-improvement).coerceAtMost(0.15) / 0.15).toFloat()
++                Triple(
++                    (0.30f - strength * 0.30f).coerceAtLeast(0f),
++                    context.getColor(R.color.hh_red_600),
++                    "NOT AERO"
++                )
++            }
++            else -> Triple(0.42f, context.getColor(R.color.hh_yellow_darker), "NEUTRAL")
++        }
++
++        val signature = "$aeroT|$color|$badge"
++        if (signature == lastSignature) return
++        lastSignature = signature
++
++        riderView.setState(aeroT, color, false, badge)
++        viewUpdated()
++    }
++}
 diff --git a/app/src/main/java/com/valterc/ki2/karoo/views/GearsProExtensionView.kt b/app/src/main/java/com/valterc/ki2/karoo/views/GearsProExtensionView.kt
 new file mode 100644
 index 0000000..f32340a
@@ -3178,6 +3456,177 @@ index daac447..ebacd72 100644
                      jsonObject.get(KEY_DESCRIPTION).getAsString(),
                      Instant.parse(jsonObject.get(KEY_PUBLISHED_DATE).getAsString()),
                      jsonObject.get(KEY_URL).getAsString(),
+diff --git a/app/src/main/java/com/valterc/ki2/views/RiderAeroView.kt b/app/src/main/java/com/valterc/ki2/views/RiderAeroView.kt
+new file mode 100644
+index 0000000..2512b22
+--- /dev/null
++++ b/app/src/main/java/com/valterc/ki2/views/RiderAeroView.kt
+@@ -0,0 +1,165 @@
++package com.valterc.ki2.views
++
++import android.content.Context
++import android.graphics.Canvas
++import android.graphics.Color
++import android.graphics.Paint
++import android.view.View
++import kotlin.math.sqrt
++
++/**
++ * A simplified side-view cyclist-on-a-bike silhouette that leans from an
++ * upright position into an aero tuck as [aeroT] goes from 0 (upright) to
++ * 1 (full tuck). The rider (not the bike frame) is tinted by the caller to
++ * signal whether the current position is more or less aero than a
++ * reference — a glanceable "am I aero right now?" independent of reading
++ * a raw number.
++ */
++class RiderAeroView(context: Context) : View(context) {
++
++    private var aeroT: Float = 0.35f
++    private var riderColor: Int = Color.GRAY
++    private var frameColor: Int = Color.WHITE
++    private var waiting: Boolean = true
++    private var badgeText: String = ""
++
++    private val framePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
++        style = Paint.Style.STROKE
++        strokeCap = Paint.Cap.ROUND
++    }
++    private val riderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
++        style = Paint.Style.STROKE
++        strokeCap = Paint.Cap.ROUND
++    }
++    private val headPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
++        style = Paint.Style.FILL
++    }
++    private val windPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
++        style = Paint.Style.STROKE
++        strokeCap = Paint.Cap.ROUND
++    }
++    private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
++        textAlign = Paint.Align.CENTER
++        isFakeBoldText = true
++    }
++
++    /** Neutral bike-frame color, matching the Karoo theme (black on white / white on dark). */
++    fun setFrameColor(color: Int) {
++        frameColor = color
++        invalidate()
++    }
++
++    /**
++     * @param aeroT 0 = upright, 1 = full aero tuck.
++     * @param color rider tint: green when more aero than baseline, red when
++     *              less, amber/grey when neutral or waiting for data.
++     * @param waiting true while there isn't yet a CdA estimate to show.
++     * @param badgeText short label drawn under the scene when there's room
++     *                  ("AERO" / "NOT AERO" / "NEUTRAL"), ignored while waiting.
++     */
++    fun setState(aeroT: Float, color: Int, waiting: Boolean, badgeText: String) {
++        this.aeroT = aeroT.coerceIn(0f, 1f)
++        this.riderColor = color
++        this.waiting = waiting
++        this.badgeText = badgeText
++        invalidate()
++    }
++
++    override fun onDraw(canvas: Canvas) {
++        super.onDraw(canvas)
++        val w = width.toFloat()
++        val h = height.toFloat()
++        if (w <= 0f || h <= 0f) return
++
++        val showBadge = !waiting && badgeText.isNotEmpty() && h >= 90f && w >= 90f
++        val sceneTop = if (showBadge) h * 0.24f else 0f
++        val sceneH = (h - sceneTop).coerceAtLeast(1f)
++        val unit = sceneH.coerceAtMost(w * 0.6f)
++
++        val wheelRadius = unit * 0.16f
++        val wheelCenterY = sceneTop + sceneH * 0.72f
++        val rearWheelX = w * 0.30f
++        val frontWheelX = w * 0.74f
++
++        val bbX = w * 0.50f
++        val bbY = wheelCenterY - wheelRadius * 0.05f
++
++        val seatX = w * 0.40f
++        val seatY = wheelCenterY - wheelRadius * 1.7f
++
++        val headTubeX = w * 0.68f
++        val headTubeY = wheelCenterY - wheelRadius * 1.55f
++
++        // Bike frame: neutral theme color, unaffected by aero state.
++        framePaint.color = frameColor
++        framePaint.strokeWidth = unit * 0.045f
++        canvas.drawCircle(rearWheelX, wheelCenterY, wheelRadius, framePaint)
++        canvas.drawCircle(frontWheelX, wheelCenterY, wheelRadius, framePaint)
++        canvas.drawLine(rearWheelX, wheelCenterY, seatX, seatY, framePaint)
++        canvas.drawLine(seatX, seatY, bbX, bbY, framePaint)
++        canvas.drawLine(bbX, bbY, rearWheelX, wheelCenterY, framePaint)
++        canvas.drawLine(bbX, bbY, headTubeX, headTubeY, framePaint)
++        canvas.drawLine(seatX, seatY, headTubeX, headTubeY, framePaint)
++        canvas.drawLine(headTubeX, headTubeY, frontWheelX, wheelCenterY, framePaint)
++
++        // Rider posture: interpolate hip-fixed torso/arm from upright to a
++        // low, forward aero tuck as aeroT increases.
++        val hipX = seatX
++        val hipY = seatY - wheelRadius * 0.15f
++
++        val uprightShoulderX = hipX - wheelRadius * 0.05f
++        val uprightShoulderY = hipY - wheelRadius * 1.55f
++        val aeroShoulderX = headTubeX * 0.97f
++        val aeroShoulderY = hipY - wheelRadius * 0.75f
++        val shoulderX = lerp(uprightShoulderX, aeroShoulderX, aeroT)
++        val shoulderY = lerp(uprightShoulderY, aeroShoulderY, aeroT)
++
++        val handlebarUprightX = headTubeX
++        val handlebarUprightY = headTubeY - wheelRadius * 0.1f
++        val handlebarAeroX = headTubeX * 1.02f
++        val handlebarAeroY = headTubeY + wheelRadius * 0.35f
++        val handlebarX = lerp(handlebarUprightX, handlebarAeroX, aeroT)
++        val handlebarY = lerp(handlebarUprightY, handlebarAeroY, aeroT)
++
++        riderPaint.color = riderColor
++        riderPaint.strokeWidth = unit * 0.06f
++        canvas.drawLine(hipX, hipY, bbX, bbY, riderPaint) // leg
++        canvas.drawLine(hipX, hipY, shoulderX, shoulderY, riderPaint) // torso
++        canvas.drawLine(shoulderX, shoulderY, handlebarX, handlebarY, riderPaint) // arm
++
++        var dirX = shoulderX - hipX
++        var dirY = shoulderY - hipY
++        val dirLen = sqrt(dirX * dirX + dirY * dirY).coerceAtLeast(0.001f)
++        dirX /= dirLen
++        dirY /= dirLen
++        val headRadius = wheelRadius * 0.42f
++        val headCenterX = shoulderX + dirX * (headRadius + wheelRadius * 0.15f)
++        val headCenterY = shoulderY + dirY * (headRadius + wheelRadius * 0.15f)
++        headPaint.color = riderColor
++        canvas.drawCircle(headCenterX, headCenterY, headRadius, headPaint)
++
++        // Motion lines behind the head/back: only in a clearly-aero pose,
++        // and only when there's enough width to draw them without crowding.
++        if (!waiting && aeroT > 0.62f && w > sceneH * 1.4f) {
++            windPaint.color = riderColor
++            windPaint.alpha = 110
++            windPaint.strokeWidth = unit * 0.03f
++            val lineLen = unit * 0.16f
++            for (i in 0..2) {
++                val ly = headCenterY - headRadius * 0.3f + i * headRadius * 0.6f
++                val lx = headCenterX - headRadius * 1.3f - i * unit * 0.05f
++                canvas.drawLine(lx, ly, lx - lineLen, ly, windPaint)
++            }
++        }
++
++        if (showBadge || waiting) {
++            val topStrip = if (showBadge) sceneTop else h * 0.24f
++            textPaint.color = if (waiting) Color.GRAY else riderColor
++            textPaint.textSize = (topStrip * 0.6f).coerceIn(16f, 42f)
++            val label = if (waiting) "..." else badgeText
++            canvas.drawText(label, w / 2f, topStrip * 0.72f, textPaint)
++        }
++    }
++
++    private fun lerp(a: Float, b: Float, t: Float): Float = a + (b - a) * t
++}
 diff --git a/app/src/main/res/drawable/ic_hh_chart.xml b/app/src/main/res/drawable/ic_hh_chart.xml
 new file mode 100644
 index 0000000..597a1fa
@@ -3751,7 +4200,7 @@ index 46695b9..266ac60 100644
      <string name="dash">-</string>
  
 diff --git a/app/src/main/res/xml/karoo_extension_info.xml b/app/src/main/res/xml/karoo_extension_info.xml
-index 7518e85..66a242c 100644
+index 7518e85..6d95ecb 100644
 --- a/app/src/main/res/xml/karoo_extension_info.xml
 +++ b/app/src/main/res/xml/karoo_extension_info.xml
 @@ -1,6 +1,6 @@
@@ -3762,7 +4211,7 @@ index 7518e85..66a242c 100644
      displayName="@string/app_name"
      icon="@drawable/ic_icon"
      scansDevices="true">
-@@ -130,4 +130,67 @@
+@@ -130,4 +130,81 @@
          icon="@drawable/ic_hh_battery"
          typeId="DATATYPE_VISUAL_BIKE_BATTERY" />
  
@@ -3800,6 +4249,20 @@ index 7518e85..66a242c 100644
 +        graphical="true"
 +        icon="@drawable/ic_hh_wind"
 +        typeId="DATATYPE_AERO_SCORE" />
++
++    <DataType
++        description="Rider silhouette that tucks and turns green when you're more aero than your calibrated baseline CdA, and sits up red when you're not."
++        displayName="Aero Visual"
++        graphical="true"
++        icon="@drawable/ic_hh_wind"
++        typeId="DATATYPE_AERO_VISUAL" />
++
++    <DataType
++        description="Watts gained or lost to drag right now versus your calibrated baseline CdA, at current speed."
++        displayName="Aero Watts"
++        graphical="true"
++        icon="@drawable/ic_hh_wind"
++        typeId="DATATYPE_AERO_WATTS" />
 +
 +    <DataType
 +        description="Apparent wind in m/s from the calibrated CdA. + headwind, − tailwind/drafting."
