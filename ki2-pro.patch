@@ -11,6 +11,35 @@ index 267594c..a31b794 100644
          minSdk 26
          targetSdk 34
  		
+diff --git a/app/manifest-template.json b/app/manifest-template.json
+index 1b0113b..fe24be5 100644
+--- a/app/manifest-template.json
++++ b/app/manifest-template.json
+@@ -1,8 +1,8 @@
+ {
+-  "label": "Ki2",
+-  "packageName": "com.valterc.ki2",
++  "label": "Ki2 Pro",
++  "packageName": "com.valterc.ki2.pro",
+   "iconUrl": "https://github.com/valterc/ki2/releases/latest/download/icon.png",
+-  "latestApkUrl": "https://github.com/valterc/ki2/releases/latest/download/ki2-release.apk",
++  "latestApkUrl": "https://github.com/lliedecke/ki2-pro-v2/releases/latest/download/ki2-pro.apk",
+   "latestVersion": "__VERSION_NAME__",
+   "latestVersionCode": __VERSION_CODE__,
+   "developer": "Valter C.",
+diff --git a/app/src/main/AndroidManifest.xml b/app/src/main/AndroidManifest.xml
+index c7fa968..0d4b9a6 100644
+--- a/app/src/main/AndroidManifest.xml
++++ b/app/src/main/AndroidManifest.xml
+@@ -75,7 +75,7 @@
+ 
+         <meta-data
+             android:name="io.hammerhead.karooext.MANIFEST_URL"
+-            android:value="https://github.com/valterc/ki2/releases/latest/download/manifest.json" />
++            android:value="https://github.com/lliedecke/ki2-pro-v2/releases/latest/download/manifest.json" />
+ 
+         <receiver android:name="com.valterc.ki2.receivers.ChangeShiftModeReceiver" />
+     </application>
 diff --git a/app/src/main/java/com/valterc/ki2/data/action/KarooAction.java b/app/src/main/java/com/valterc/ki2/data/action/KarooAction.java
 index 6918d47..970c5ca 100644
 --- a/app/src/main/java/com/valterc/ki2/data/action/KarooAction.java
@@ -143,6 +172,105 @@ index 4c79d02..ce906f7 100644
      /**
       * Get the battery level that should be considered as low battery.
       *
+diff --git a/app/src/main/java/com/valterc/ki2/fragments/settings/GeneralSettingsFragment.java b/app/src/main/java/com/valterc/ki2/fragments/settings/GeneralSettingsFragment.java
+index 845aa99..70b97f1 100644
+--- a/app/src/main/java/com/valterc/ki2/fragments/settings/GeneralSettingsFragment.java
++++ b/app/src/main/java/com/valterc/ki2/fragments/settings/GeneralSettingsFragment.java
+@@ -2,12 +2,14 @@ package com.valterc.ki2.fragments.settings;
+ 
+ import android.content.res.Resources;
+ import android.os.Bundle;
++import android.text.InputType;
+ import android.util.TypedValue;
+ import android.view.View;
+ 
+ import androidx.annotation.NonNull;
+ import androidx.annotation.Nullable;
+ import androidx.appcompat.app.AlertDialog;
++import androidx.preference.EditTextPreference;
+ import androidx.preference.Preference;
+ import androidx.preference.PreferenceFragmentCompat;
+ import androidx.recyclerview.widget.RecyclerView;
+@@ -32,6 +34,40 @@ public class GeneralSettingsFragment extends PreferenceFragmentCompat {
+ 
+             return true;
+         });
++
++        // Ride metrics / Aero & Fuel: force a numeric keyboard for these EditTextPreference
++        // fields instead of the default full keyboard, matching the rest of the app's
++        // touch-friendly controls. AndroidX EditTextPreference does not honor
++        // android:inputType from XML, so it must be bound here.
++        final int integerInput = InputType.TYPE_CLASS_NUMBER;
++        final int decimalInput = InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL;
++
++        setupNumericField(R.string.preference_wheel_circumference, integerInput);
++        setupNumericField(R.string.preference_target_cadence, integerInput);
++        setupNumericField(R.string.preference_total_mass, decimalInput);
++        setupNumericField(R.string.preference_crr, decimalInput);
++        setupNumericField(R.string.preference_drivetrain_efficiency, decimalInput);
++        setupNumericField(R.string.preference_air_density, decimalInput);
++        setupNumericField(R.string.preference_calibrated_cda, decimalInput);
++        setupNumericField(R.string.preference_race_distance, decimalInput);
++        setupNumericField(R.string.preference_target_split, decimalInput);
++        setupNumericField(R.string.preference_carbs_per_hour, integerInput);
++        setupNumericField(R.string.preference_carbs_portion, integerInput);
++    }
++
++    private void setupNumericField(int keyResId, int inputType) {
++        Preference preference = findPreference(getString(keyResId));
++        if (!(preference instanceof EditTextPreference)) {
++            return;
++        }
++
++        ((EditTextPreference) preference).setOnBindEditTextListener(editText -> {
++            editText.setInputType(inputType);
++            editText.setSingleLine(true);
++            if (editText.getText() != null) {
++                editText.setSelection(editText.getText().length());
++            }
++        });
+     }
+ 
+     @Override
+diff --git a/app/src/main/java/com/valterc/ki2/fragments/settings/overlay/opacity/OverlayOpacityDialogFragment.java b/app/src/main/java/com/valterc/ki2/fragments/settings/overlay/opacity/OverlayOpacityDialogFragment.java
+index a27664d..9e98893 100644
+--- a/app/src/main/java/com/valterc/ki2/fragments/settings/overlay/opacity/OverlayOpacityDialogFragment.java
++++ b/app/src/main/java/com/valterc/ki2/fragments/settings/overlay/opacity/OverlayOpacityDialogFragment.java
+@@ -59,7 +59,7 @@ public class OverlayOpacityDialogFragment extends DialogFragment {
+         PreferencesView preferencesView = new PreferencesView(requireContext());
+ 
+         LinearLayout linearLayoutContainer = view.findViewById(R.id.viewstub_overlay_opacity_view_container);
+-        Ki2ExtensionContext ki2Context = new Ki2ExtensionContext("ki2", requireContext());
++        Ki2ExtensionContext ki2Context = new Ki2ExtensionContext("ki2pro", requireContext());
+         OverlayViewBuilderEntry entry = OverlayViewBuilderRegistry.getBuilder(requireArguments().getString(PARAMETER_THEME));
+         View viewOverlay = inflater.inflate(Objects.requireNonNull(entry).getLayoutId(), linearLayoutContainer, false);
+ 
+diff --git a/app/src/main/java/com/valterc/ki2/fragments/settings/overlay/position/OverlayPositionDialogFragment.java b/app/src/main/java/com/valterc/ki2/fragments/settings/overlay/position/OverlayPositionDialogFragment.java
+index 45ec358..2e6de6a 100644
+--- a/app/src/main/java/com/valterc/ki2/fragments/settings/overlay/position/OverlayPositionDialogFragment.java
++++ b/app/src/main/java/com/valterc/ki2/fragments/settings/overlay/position/OverlayPositionDialogFragment.java
+@@ -66,7 +66,7 @@ public class OverlayPositionDialogFragment extends DialogFragment {
+         PreferencesView preferencesView = new PreferencesView(requireContext());
+ 
+         RelativeLayout relativeLayout = view.findViewById(R.id.relativelayout_overlay_position);
+-        Ki2ExtensionContext ki2Context = new Ki2ExtensionContext("ki2", requireContext());
++        Ki2ExtensionContext ki2Context = new Ki2ExtensionContext("ki2pro", requireContext());
+ 
+         OverlayViewBuilderEntry entry = OverlayViewBuilderRegistry.getBuilder(theme);
+         assert entry != null;
+diff --git a/app/src/main/java/com/valterc/ki2/fragments/settings/overlay/theme/OverlayThemeAdapter.java b/app/src/main/java/com/valterc/ki2/fragments/settings/overlay/theme/OverlayThemeAdapter.java
+index 35ea8b7..ef63f9a 100644
+--- a/app/src/main/java/com/valterc/ki2/fragments/settings/overlay/theme/OverlayThemeAdapter.java
++++ b/app/src/main/java/com/valterc/ki2/fragments/settings/overlay/theme/OverlayThemeAdapter.java
+@@ -48,7 +48,7 @@ public class OverlayThemeAdapter extends RecyclerView.Adapter<OverlayThemeViewHo
+ 
+         this.themeValues = context.getResources().getStringArray(R.array.preference_values_overlay_theme);
+         this.themeTitles = context.getResources().getStringArray(R.array.preference_titles_overlay_theme);
+-        this.ki2Context = new Ki2ExtensionContext("ki2", context);
++        this.ki2Context = new Ki2ExtensionContext("ki2pro", context);
+         this.preferencesView = new PreferencesView(context);
+ 
+         DeviceId deviceId = new DeviceId(67726, 1, 5);
 diff --git a/app/src/main/java/com/valterc/ki2/input/ActionAdapter.java b/app/src/main/java/com/valterc/ki2/input/ActionAdapter.java
 index f44d108..4767c07 100644
 --- a/app/src/main/java/com/valterc/ki2/input/ActionAdapter.java
@@ -836,7 +964,7 @@ index 315bd0a..681da58 100644
  }
 \ No newline at end of file
 diff --git a/app/src/main/java/com/valterc/ki2/karoo/Ki2ExtensionService.kt b/app/src/main/java/com/valterc/ki2/karoo/Ki2ExtensionService.kt
-index 146985f..cb26612 100644
+index 146985f..d86fd0a 100644
 --- a/app/src/main/java/com/valterc/ki2/karoo/Ki2ExtensionService.kt
 +++ b/app/src/main/java/com/valterc/ki2/karoo/Ki2ExtensionService.kt
 @@ -5,23 +5,32 @@ import android.content.Intent
@@ -872,7 +1000,15 @@ index 146985f..cb26612 100644
  import com.valterc.ki2.karoo.datatypes.visual.GearsSizeVisualDataType
  import com.valterc.ki2.karoo.overlay.OverlayWindowHandler
  import com.valterc.ki2.karoo.shifting.ShiftingAudioAlertHandler
-@@ -45,7 +54,7 @@ class Ki2ExtensionService : KarooExtension("ki2", BuildConfig.VERSION_NAME) {
+@@ -38,14 +47,14 @@ import kotlinx.coroutines.delay
+ import kotlinx.coroutines.launch
+ import timber.log.Timber
+ 
+-class Ki2ExtensionService : KarooExtension("ki2", BuildConfig.VERSION_NAME) {
++class Ki2ExtensionService : KarooExtension("ki2pro", BuildConfig.VERSION_NAME) {
+ 
+     companion object {
+         fun getIntent(): Intent {
              val serviceIntent = Intent()
              serviceIntent.setComponent(
                  ComponentName(
@@ -2874,6 +3010,39 @@ index d3f8bee..be94cdd 100644
          return serviceIntent;
      }
  
+diff --git a/app/src/main/java/com/valterc/ki2/update/GetLatestReleaseInfoTask.java b/app/src/main/java/com/valterc/ki2/update/GetLatestReleaseInfoTask.java
+index daac447..ebacd72 100644
+--- a/app/src/main/java/com/valterc/ki2/update/GetLatestReleaseInfoTask.java
++++ b/app/src/main/java/com/valterc/ki2/update/GetLatestReleaseInfoTask.java
+@@ -22,15 +22,16 @@ import timber.log.Timber;
+ 
+ public class GetLatestReleaseInfoTask implements Callable<ReleaseInfo> {
+ 
+-    public static final String URL_LATEST_RELEASE = "https://api.github.com/repos/valterc/ki2/releases/latest";
++    public static final String URL_LATEST_RELEASE = "https://api.github.com/repos/lliedecke/ki2-pro-v2/releases/latest";
+     public static final String KEY_ASSETS = "assets";
+     public static final String KEY_DESCRIPTION = "body";
+     public static final String KEY_NAME = "name";
+     public static final String KEY_PACKAGE_SIZE = "size";
+     public static final String KEY_PACKAGE_URL = "browser_download_url";
+     public static final String KEY_PUBLISHED_DATE = "published_at";
+-    public static final String KEY_URL = "html_url";
+-    public static final String PATTERN_PACKAGE_NAME_END = "release.apk";
++    public static final String KEY_URL = "html_url";
++    public static final String KEY_TAG_NAME = "tag_name";
++    public static final String PATTERN_PACKAGE_NAME_END = "ki2-pro.apk";
+ 
+     @NonNull
+     @Override
+@@ -77,7 +78,7 @@ public class GetLatestReleaseInfoTask implements Callable<ReleaseInfo> {
+             }
+ 
+             return new ReleaseInfo(
+-                    jsonObject.get(KEY_NAME).getAsString(),
++                    jsonObject.get(KEY_TAG_NAME).getAsString(),
+                     jsonObject.get(KEY_DESCRIPTION).getAsString(),
+                     Instant.parse(jsonObject.get(KEY_PUBLISHED_DATE).getAsString()),
+                     jsonObject.get(KEY_URL).getAsString(),
 diff --git a/app/src/main/res/layout/view_karoo_gears_pro.xml b/app/src/main/res/layout/view_karoo_gears_pro.xml
 new file mode 100644
 index 0000000..760a62b
@@ -3396,9 +3565,17 @@ index 46695b9..266ac60 100644
      <string name="dash">-</string>
  
 diff --git a/app/src/main/res/xml/karoo_extension_info.xml b/app/src/main/res/xml/karoo_extension_info.xml
-index 7518e85..a3cf044 100644
+index 7518e85..158e7fe 100644
 --- a/app/src/main/res/xml/karoo_extension_info.xml
 +++ b/app/src/main/res/xml/karoo_extension_info.xml
+@@ -1,6 +1,6 @@
+ <?xml version="1.0" encoding="utf-8"?>
+ <ExtensionInfo
+-    id="ki2"
++    id="ki2pro"
+     displayName="@string/app_name"
+     icon="@drawable/ic_icon"
+     scansDevices="true">
 @@ -130,4 +130,67 @@
          icon="@drawable/ic_hh_battery"
          typeId="DATATYPE_VISUAL_BIKE_BATTERY" />
@@ -3576,65 +3753,3 @@ index e61483c..c9aa2f8 100644
                  android:targetClass="com.valterc.ki2.activities.update.UpdateActivity"/>
          </Preference>
  
-diff --git a/app/src/main/java/com/valterc/ki2/update/GetLatestReleaseInfoTask.java b/app/src/main/java/com/valterc/ki2/update/GetLatestReleaseInfoTask.java
-index daac447..ebacd72 100644
---- a/app/src/main/java/com/valterc/ki2/update/GetLatestReleaseInfoTask.java
-+++ b/app/src/main/java/com/valterc/ki2/update/GetLatestReleaseInfoTask.java
-@@ -22,15 +22,16 @@ import timber.log.Timber;
- 
- public class GetLatestReleaseInfoTask implements Callable<ReleaseInfo> {
- 
--    public static final String URL_LATEST_RELEASE = "https://api.github.com/repos/valterc/ki2/releases/latest";
-+    public static final String URL_LATEST_RELEASE = "https://api.github.com/repos/lliedecke/ki2-pro-v2/releases/latest";
-     public static final String KEY_ASSETS = "assets";
-     public static final String KEY_DESCRIPTION = "body";
-     public static final String KEY_NAME = "name";
-     public static final String KEY_PACKAGE_SIZE = "size";
-     public static final String KEY_PACKAGE_URL = "browser_download_url";
-     public static final String KEY_PUBLISHED_DATE = "published_at";
--    public static final String KEY_URL = "html_url";
--    public static final String PATTERN_PACKAGE_NAME_END = "release.apk";
-+    public static final String KEY_URL = "html_url";
-+    public static final String KEY_TAG_NAME = "tag_name";
-+    public static final String PATTERN_PACKAGE_NAME_END = "ki2-pro.apk";
- 
-     @NonNull
-     @Override
-@@ -77,7 +78,7 @@ public class GetLatestReleaseInfoTask implements Callable<ReleaseInfo> {
-             }
- 
-             return new ReleaseInfo(
--                    jsonObject.get(KEY_NAME).getAsString(),
-+                    jsonObject.get(KEY_TAG_NAME).getAsString(),
-                     jsonObject.get(KEY_DESCRIPTION).getAsString(),
-                     Instant.parse(jsonObject.get(KEY_PUBLISHED_DATE).getAsString()),
-                     jsonObject.get(KEY_URL).getAsString(),
-diff --git a/app/manifest-template.json b/app/manifest-template.json
-index 1b0113b..fe24be5 100644
---- a/app/manifest-template.json
-+++ b/app/manifest-template.json
-@@ -1,8 +1,8 @@
- {
--  "label": "Ki2",
--  "packageName": "com.valterc.ki2",
-+  "label": "Ki2 Pro",
-+  "packageName": "com.valterc.ki2.pro",
-   "iconUrl": "https://github.com/valterc/ki2/releases/latest/download/icon.png",
--  "latestApkUrl": "https://github.com/valterc/ki2/releases/latest/download/ki2-release.apk",
-+  "latestApkUrl": "https://github.com/lliedecke/ki2-pro-v2/releases/latest/download/ki2-pro.apk",
-   "latestVersion": "__VERSION_NAME__",
-   "latestVersionCode": __VERSION_CODE__,
-   "developer": "Valter C.",
-diff --git a/app/src/main/AndroidManifest.xml b/app/src/main/AndroidManifest.xml
-index c7fa968..0d4b9a6 100644
---- a/app/src/main/AndroidManifest.xml
-+++ b/app/src/main/AndroidManifest.xml
-@@ -75,7 +75,7 @@
- 
-         <meta-data
-             android:name="io.hammerhead.karooext.MANIFEST_URL"
--            android:value="https://github.com/valterc/ki2/releases/latest/download/manifest.json" />
-+            android:value="https://github.com/lliedecke/ki2-pro-v2/releases/latest/download/manifest.json" />
- 
-         <receiver android:name="com.valterc.ki2.receivers.ChangeShiftModeReceiver" />
-     </application>
